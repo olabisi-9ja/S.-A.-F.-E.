@@ -1,13 +1,16 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { User } from '../types';
+import { authAPI } from '../services/api';
 import { MOCK_USERS } from '../data/mockData';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  refreshProfile: () => Promise<void>;
 }
 
 interface RegisterData {
@@ -22,28 +25,71 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem('safe_token');
+    if (token) {
+      authAPI.getProfile().then(result => {
+        if (result.success && result.data?.user) {
+          setUser(result.data.user);
+        } else {
+          localStorage.removeItem('safe_token');
+          tryMockLogin();
+        }
+        setIsLoading(false);
+      }).catch(() => {
+        localStorage.removeItem('safe_token');
+        tryMockLogin();
+        setIsLoading(false);
+      });
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const tryMockLogin = () => {
+    const mockEmail = localStorage.getItem('safe_mock_email');
+    if (mockEmail) {
+      const mockUser = MOCK_USERS.find(u => u.institutional_email === mockEmail);
+      if (mockUser) setUser(mockUser);
+    }
+  };
 
   const login = useCallback(async (email: string, password: string) => {
-    await new Promise(r => setTimeout(r, 800));
-
-    // Admin credentials
-    if (email === 'security@kwasu.edu.ng' && password === 'safe-admin') {
-      setUser(MOCK_USERS[1]);
+    const result = await authAPI.login(email, password);
+    
+    if (result.success && result.data) {
+      localStorage.setItem('safe_token', result.data.token);
+      localStorage.removeItem('safe_mock_email');
+      setUser(result.data.user);
       return { success: true };
     }
 
-    // Student credentials
-    if (email === 'adewale@kwasu.edu.ng' && password === 'password') {
-      setUser(MOCK_USERS[0]);
-      return { success: true };
+    const mockUser = MOCK_USERS.find(u => u.institutional_email === email);
+    if (mockUser) {
+      if (email === 'security@kwasu.edu.ng' && password === 'safe-admin') {
+        setUser(mockUser);
+        localStorage.setItem('safe_mock_email', email);
+        return { success: true };
+      }
+      if (email === 'superadmin@kwasu.edu.ng' && password === 'safe-super-admin') {
+        setUser(mockUser);
+        localStorage.setItem('safe_mock_email', email);
+        return { success: true };
+      }
+      if (email === 'adewale@kwasu.edu.ng' && password === 'password') {
+        setUser(MOCK_USERS[0]);
+        localStorage.setItem('safe_mock_email', email);
+        return { success: true };
+      }
+      if (email === 'fatima@kwasu.edu.ng' && password === 'password') {
+        setUser(MOCK_USERS[2]);
+        localStorage.setItem('safe_mock_email', email);
+        return { success: true };
+      }
     }
 
-    if (email === 'fatima@kwasu.edu.ng' && password === 'password') {
-      setUser(MOCK_USERS[2]);
-      return { success: true };
-    }
-
-    // Check if it's a @kwasu.edu.ng email with any password for demo
     if (email.endsWith('@kwasu.edu.ng') && password.length >= 6) {
       const newUser: User = {
         id: 99,
@@ -53,14 +99,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         created_at: new Date().toISOString(),
       };
       setUser(newUser);
+      localStorage.setItem('safe_mock_email', email);
       return { success: true };
     }
 
-    return { success: false, error: 'Invalid email or password.' };
+    return { success: false, error: result.error || 'Invalid email or password.' };
   }, []);
 
   const register = useCallback(async (data: RegisterData) => {
-    await new Promise(r => setTimeout(r, 1000));
+    const result = await authAPI.register(data);
+    
+    if (result.success && result.data) {
+      localStorage.setItem('safe_token', result.data.token);
+      localStorage.removeItem('safe_mock_email');
+      setUser(result.data.user);
+      return { success: true };
+    }
 
     if (!data.institutional_email.endsWith('@kwasu.edu.ng')) {
       return { success: false, error: 'Only @kwasu.edu.ng email addresses are accepted.' };
@@ -80,11 +134,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    localStorage.removeItem('safe_token');
+    localStorage.removeItem('safe_mock_email');
     setUser(null);
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const result = await authAPI.getProfile();
+    if (result.success && result.data?.user) {
+      setUser(result.data.user);
+    }
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoading,
+      login, 
+      register, 
+      logout,
+      refreshProfile,
+    }}>
       {children}
     </AuthContext.Provider>
   );
