@@ -19,13 +19,13 @@ router.post('/', createIncident);
 // Get incidents (filtered by role)
 router.get('/', getIncidents);
 
+// Get statistics (must be before /:id)
+router.get('/stats', getIncidentStats);
+
 // Get single incident
 router.get('/:id', getIncidentById);
 
 // Update incident (admin only)
 router.patch('/:id', adminMiddleware, updateIncident);
-
-// Get statistics
-router.get('/stats', getIncidentStats);
 
 export default router;

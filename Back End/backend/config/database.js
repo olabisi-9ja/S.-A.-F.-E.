@@ -51,7 +51,7 @@ export async function testConnection() {
 // Sync models
 export async function syncModels() {
   try {
-    await sequelize.sync({ alter: process.env.NODE_ENV === 'development' });
+    await sequelize.sync({ alter: false });
     console.log('✅ Database models synchronized.');
   } catch (error) {
     console.error('❌ Error syncing models:', error.message);
