@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { Alert, MeshPacket, User, Notification } from '../models/index.js';
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 
 const MESH_ENCRYPTION_KEY = process.env.MESH_ENCRYPTION_KEY || 'SAFE_MESH_KEY_32_CHARACTERS_LONG';
 
@@ -192,7 +192,7 @@ export const getMeshStats = async (req, res) => {
     const total = await MeshPacket.count();
     const synced = await MeshPacket.count({ where: { synced_to_server: true } });
     const avgHops = await MeshPacket.findOne({
-      attributes: [[sequelize.fn('AVG', sequelize.col('hop_count')), 'avg_hops']],
+      attributes: [[Sequelize.fn('AVG', Sequelize.col('hop_count')), 'avg_hops']],
     });
 
     res.json({

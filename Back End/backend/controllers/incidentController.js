@@ -1,4 +1,4 @@
-import { Op } from 'sequelize';
+import { Op, Sequelize } from 'sequelize';
 import axios from 'axios';
 import { Incident, User, Message, Notification } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
@@ -296,11 +296,21 @@ export const getIncidentStats = async (req, res) => {
     }
 
     const total = await Incident.count({ where });
-    const byStatus = await Incident.count({ where, group: 'status' });
-    const byCategory = await Incident.count({ where, group: 'category' });
+    const byStatus = await Incident.findAll({
+      where,
+      attributes: ['status', [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
+      group: ['status'],
+      raw: true,
+    });
+    const byCategory = await Incident.findAll({
+      where,
+      attributes: ['category', [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']],
+      group: ['category'],
+      raw: true,
+    });
     const avgSeverity = await Incident.findOne({
       where,
-      attributes: [[sequelize.fn('AVG', sequelize.col('ai_severity_score')), 'avg_severity']],
+      attributes: [[Sequelize.fn('AVG', Sequelize.col('ai_severity_score')), 'avg_severity']],
     });
 
     res.json({

@@ -1,7 +1,7 @@
 import { fn, col } from 'sequelize';
 import sequelize from './database.js';
 
-const isSQLite = sequelize.dialect === 'sqlite';
+const isSQLite = sequelize.getDialect() === 'sqlite';
 
 export function dateTrunc(dateCol, unit = 'day') {
   if (isSQLite) {
@@ -16,7 +16,7 @@ export function dateTrunc(dateCol, unit = 'day') {
 
 export function dateDiffSeconds(col1, col2) {
   if (isSQLite) {
-    return fn('ROUND', fn('JULIANDAY', col(col2)) - fn('JULIANDAY', col(col1)) * 86400);
+    return sequelize.literal(`ROUND((JULIANDAY(\`${col2}\`) - JULIANDAY(\`${col1}\`)) * 86400)`);
   }
   return fn('TIMESTAMPDIFF', sequelize.literal('SECOND'), col(col1), col(col2));
 }

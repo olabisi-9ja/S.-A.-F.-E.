@@ -12,9 +12,9 @@ const router = express.Router();
 router.post('/sync', authMiddleware, syncMeshPacket);
 
 // Get mesh packets (admin only)
-router.get('/packets', adminMiddleware, getMeshPackets);
+router.get('/packets', authMiddleware, adminMiddleware, getMeshPackets);
 
 // Get mesh statistics (admin only)
-router.get('/stats', adminMiddleware, getMeshStats);
+router.get('/stats', authMiddleware, adminMiddleware, getMeshStats);
 
 export default router;
