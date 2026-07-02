@@ -63,7 +63,7 @@ export function AdminUsersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { label: 'Total Users', value: EXTRA_USERS.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
             { label: 'Security Staff', value: EXTRA_USERS.filter(u => u.role !== 'standard_user').length, icon: Shield, color: 'text-red-600', bg: 'bg-red-50' },
@@ -120,37 +120,39 @@ export function AdminUsersPage() {
           {filtered.map(user => (
             <Card key={user.id}>
               <CardContent className="py-3">
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0 ${
-                    user.role !== 'standard_user' ? 'bg-red-700' : 'bg-blue-600'
-                  }`}>
-                    {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
+                    {/* Avatar */}
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-sm shrink-0 ${
+                      user.role !== 'standard_user' ? 'bg-red-700' : 'bg-blue-600'
+                    }`}>
+                      {user.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center flex-wrap gap-2 mb-0.5">
+                        <span className="font-semibold text-sm text-gray-900 truncate">{user.full_name}</span>
+                        <Badge variant={roleVariant(user.role)}>
+                          {user.role !== 'standard_user' && <Shield className="w-3 h-3" />}
+                          {roleLabel(user.role)}
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
+                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{user.institutional_email}</span>
+                        {user.matric_or_staff_id && (
+                          <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{user.matric_or_staff_id}</span>
+                        )}
+                        <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-2 mb-0.5">
-                      <span className="font-semibold text-sm text-gray-900">{user.full_name}</span>
-                      <Badge variant={roleVariant(user.role)}>
-                        {user.role !== 'standard_user' && <Shield className="w-3 h-3" />}
-                        {roleLabel(user.role)}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-gray-400">
-                      <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{user.institutional_email}</span>
-                      {user.matric_or_staff_id && (
-                        <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{user.matric_or_staff_id}</span>
-                      )}
-                      <span>Joined {new Date(user.created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 shrink-0">
-                    <button className="text-xs px-2.5 py-1 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition">
+                  <div className="flex gap-2 shrink-0 sm:ml-auto">
+                    <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition w-full sm:w-auto">
                       Edit
                     </button>
                     {user.role === 'standard_user' && (
-                      <button className="text-xs px-2.5 py-1 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition">
+                      <button className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition w-full sm:w-auto">
                         Suspend
                       </button>
                     )}
