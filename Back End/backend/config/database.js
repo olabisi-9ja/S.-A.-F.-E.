@@ -58,7 +58,7 @@ export async function testConnection() {
     logger.info('✅ Database connection established successfully.');
     return true;
   } catch (error) {
-    logger.error('❌ Unable to connect to the database:', error.message);
+    logger.error('❌ Unable to connect to the database: ' + error.message);
     return false;
   }
 }
