@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, Shield, User, Hash, Mail, Search, UserPlus } from 'lucide-react';
+import { Users, Shield, User, Hash, Mail, Search, UserPlus, X } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { MOCK_USERS } from '../../data/mockData';
@@ -36,8 +36,26 @@ const roleLabel = (role: string) => {
 export function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [usersList, setUsersList] = useState<UserType[]>(EXTRA_USERS);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUserData, setNewUserData] = useState({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '' });
 
-  const filtered = EXTRA_USERS
+  const handleAddUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newUser: UserType = {
+      id: Date.now(),
+      full_name: newUserData.full_name,
+      institutional_email: newUserData.institutional_email,
+      role: newUserData.role as any,
+      matric_or_staff_id: newUserData.matric_or_staff_id,
+      created_at: new Date().toISOString()
+    };
+    setUsersList([newUser, ...usersList]);
+    setShowAddModal(false);
+    setNewUserData({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '' });
+  };
+
+  const filtered = usersList
     .filter(u => filter === 'all' || u.role === filter)
     .filter(u =>
       search === '' ||
@@ -56,7 +74,10 @@ export function AdminUsersPage() {
             </h2>
             <p className="text-sm text-gray-500">Manage all registered users and their access roles.</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white text-sm font-semibold rounded-lg hover:bg-red-800 transition">
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white text-sm font-semibold rounded-lg hover:bg-red-800 transition"
+          >
             <UserPlus className="w-4 h-4" />
             Add User
           </button>
@@ -65,9 +86,9 @@ export function AdminUsersPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            { label: 'Total Users', value: EXTRA_USERS.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-            { label: 'Security Staff', value: EXTRA_USERS.filter(u => u.role !== 'standard_user').length, icon: Shield, color: 'text-red-600', bg: 'bg-red-50' },
-            { label: 'Students/Staff', value: EXTRA_USERS.filter(u => u.role === 'standard_user').length, icon: User, color: 'text-green-600', bg: 'bg-green-50' },
+            { label: 'Total Users', value: usersList.length, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+            { label: 'Security Staff', value: usersList.filter(u => u.role !== 'standard_user').length, icon: Shield, color: 'text-red-600', bg: 'bg-red-50' },
+            { label: 'Students/Staff', value: usersList.filter(u => u.role === 'standard_user').length, icon: User, color: 'text-green-600', bg: 'bg-green-50' },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <Card key={label}>
               <CardContent className="py-3">
@@ -138,7 +159,7 @@ export function AdminUsersPage() {
                         </Badge>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-400">
-                        <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{user.institutional_email}</span>
+                        <span className="flex items-center gap-1 min-w-0"><Mail className="w-3 h-3 shrink-0" /><span className="truncate">{user.institutional_email}</span></span>
                         {user.matric_or_staff_id && (
                           <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{user.matric_or_staff_id}</span>
                         )}
@@ -162,7 +183,48 @@ export function AdminUsersPage() {
             </Card>
           ))}
         </div>
+        </div>
       </div>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Add New User</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleAddUser} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+                <input required type="text" value={newUserData.full_name} onChange={e => setNewUserData({...newUserData, full_name: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="e.g. Adebayo Yusuf" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Institutional Email</label>
+                <input required type="email" value={newUserData.institutional_email} onChange={e => setNewUserData({...newUserData, institutional_email: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="e.g. adebayo@kwasu.edu.ng" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Matric or Staff ID</label>
+                <input required type="text" value={newUserData.matric_or_staff_id} onChange={e => setNewUserData({...newUserData, matric_or_staff_id: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="e.g. CSC/2021/010" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <select value={newUserData.role} onChange={e => setNewUserData({...newUserData, role: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white">
+                  <option value="standard_user">Student / Staff</option>
+                  <option value="security_admin">Security Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm hover:bg-red-800 transition">
+                  Create User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
