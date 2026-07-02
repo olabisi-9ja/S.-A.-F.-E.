@@ -58,6 +58,9 @@ export async function testConnection() {
     logger.info('✅ Database connection established successfully.');
     return true;
   } catch (error) {
+    console.error('\n\n--- RAW DATABASE ERROR ---');
+    console.error(error);
+    console.error('--------------------------\n\n');
     logger.error('❌ Unable to connect to the database: ' + error.message);
     return false;
   }
