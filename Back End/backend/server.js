@@ -30,13 +30,22 @@ import analyticsRoutes from './routes/analytics.js';
 const app = express();
 const server = http.createServer(app);
 
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'];
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+};
+
 // Initialize Socket.io with CORS
 const io = new Server(server, {
-  cors: {
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
+  cors: corsOptions,
   pingTimeout: 60000,
   pingInterval: 25000,
 });
@@ -46,10 +55,7 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable for development
 }));
 
-app.use(cors({
-  origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
-  credentials: true,
-}));
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
