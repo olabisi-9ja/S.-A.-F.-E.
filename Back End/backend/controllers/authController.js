@@ -25,8 +25,8 @@ export const register = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Full name, email, and password are required.' });
     }
 
-    if (!validator.isEmail(institutional_email) || !institutional_email.endsWith('@kwasu.edu.ng')) {
-      return res.status(400).json({ success: false, error: 'Valid @kwasu.edu.ng email address is required.' });
+    if (!validator.isEmail(institutional_email)) {
+      return res.status(400).json({ success: false, error: 'A valid email address is required.' });
     }
 
     if (password.length < 6) {
