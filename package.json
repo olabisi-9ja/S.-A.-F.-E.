@@ -1,0 +1,8 @@
+{
+  "name": "safe-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "vercel-build": "cd \"Front End\" && npm install && npm run build"
+  }
+}
