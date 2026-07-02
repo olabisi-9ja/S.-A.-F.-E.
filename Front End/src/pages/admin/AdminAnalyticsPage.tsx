@@ -5,14 +5,16 @@ import {
 import { Brain, TrendingUp, MapPin, AlertTriangle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
-import { CHART_DATA_WEEKLY, CHART_DATA_CATEGORY, MOCK_HOTSPOTS } from '../../data/mockData';
-
+import { getRealHotspots } from '../../utils/mapUtils';
+import { getCategoryData, getWeeklyTrend } from '../../utils/analyticsUtils';
 const PIE_COLORS = ['#b91c1c', '#d97706', '#2563eb', '#16a34a', '#7c3aed', '#6b7280'];
 
 export function AdminAnalyticsPage() {
-  const { incidents } = useApp();
+  const { incidents, alerts } = useApp();
 
-  const categoryCount = CHART_DATA_CATEGORY;
+  const categoryCount = getCategoryData(incidents);
+  const weeklyTrend = getWeeklyTrend(incidents, alerts);
+  const realHotspots = getRealHotspots(incidents);
   const totalIncidents = incidents.length;
   const avgSeverity = Math.round(incidents.reduce((s, i) => s + i.ai_severity_score, 0) / Math.max(incidents.length, 1));
   const critical = incidents.filter(i => i.ai_severity_score >= 80).length;
@@ -34,7 +36,7 @@ export function AdminAnalyticsPage() {
             { label: 'Total Incidents', value: totalIncidents, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
             { label: 'Avg. AI Severity', value: `${avgSeverity}/100`, icon: Brain, color: 'text-blue-600', bg: 'bg-blue-50' },
             { label: 'Critical (≥80)', value: critical, icon: TrendingUp, color: 'text-red-600', bg: 'bg-red-50' },
-            { label: 'Hotspot Zones', value: MOCK_HOTSPOTS.length, icon: MapPin, color: 'text-purple-600', bg: 'bg-purple-50' },
+            { label: 'Hotspot Zones', value: realHotspots.length, icon: MapPin, color: 'text-purple-600', bg: 'bg-purple-50' },
           ].map(({ label, value, icon: Icon, color, bg }) => (
             <Card key={label}>
               <CardContent className="py-4">
@@ -61,7 +63,7 @@ export function AdminAnalyticsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={CHART_DATA_WEEKLY} barGap={4}>
+                <BarChart data={weeklyTrend} barGap={4}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="day" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
@@ -137,30 +139,33 @@ export function AdminAnalyticsPage() {
               <p className="text-xs text-gray-400 mt-0.5">DBSCAN clustering — updated nightly</p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {MOCK_HOTSPOTS.map((spot, i) => (
+              {realHotspots.length === 0 && (
+                <p className="text-sm text-gray-400 py-3 text-center">No hotspot clusters detected yet.</p>
+              )}
+              {realHotspots.map((spot, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <div className={`w-3 h-3 rounded-full shrink-0 ${
-                    spot.count >= 10 ? 'bg-red-500' : spot.count >= 7 ? 'bg-amber-500' : 'bg-yellow-400'
+                    spot.count >= 10 ? 'bg-red-500' : spot.count >= 4 ? 'bg-amber-500' : 'bg-yellow-400'
                   }`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-700">
-                      Cluster {i + 1} — Zone {['Library Area', 'Female Hostel', 'Faculty Block C'][i]}
+                      {spot.label}
                     </p>
-                    <p className="text-xs text-gray-400">{spot.lat.toFixed(4)}, {spot.lng.toFixed(4)}</p>
+                    <p className="text-xs text-gray-400">{spot.latitude.toFixed(4)}, {spot.longitude.toFixed(4)}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-gray-900">{spot.count}</p>
                     <p className="text-xs text-gray-400">incidents</p>
                   </div>
                   <div className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    spot.count >= 10 ? 'bg-red-100 text-red-700' : spot.count >= 7 ? 'bg-amber-100 text-amber-700' : 'bg-yellow-100 text-yellow-700'
+                    spot.count >= 10 ? 'bg-red-100 text-red-700' : spot.count >= 4 ? 'bg-amber-100 text-amber-700' : 'bg-yellow-100 text-yellow-700'
                   }`}>
-                    {spot.count >= 10 ? 'HIGH' : spot.count >= 7 ? 'MED' : 'LOW'}
+                    {spot.count >= 10 ? 'HIGH' : spot.count >= 4 ? 'MED' : 'LOW'}
                   </div>
                 </div>
               ))}
               <p className="text-xs text-gray-400 text-center pt-2">
-                Based on DBSCAN clustering of 30-day geo-tagged incident data. Hotspot = ≥3 incidents within 100m radius.
+                Based on density clustering of live incident data. Hotspot = ≥2 incidents within ~110m radius.
               </p>
             </CardContent>
           </Card>
