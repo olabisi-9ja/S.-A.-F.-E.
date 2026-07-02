@@ -33,13 +33,29 @@ export function HomePage({ onNavigate }: HomePageProps) {
     if (sosState !== 'idle') return;
     setSosState('sending');
 
-    // Simulate GPS + network check
-    await new Promise(r => setTimeout(r, 1500));
+    try {
+      // Get real GPS location
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
 
-    const mesh = Math.random() < 0.3;
-    setUsedMesh(mesh);
-    triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https');
-    setSosState('sent');
+      const { latitude, longitude } = position.coords;
+      const mesh = !navigator.onLine || Math.random() < 0.1; // Mesh if offline or rare fallback
+      setUsedMesh(mesh);
+      triggerAlert(latitude, longitude, mesh ? 'mesh' : 'https');
+      setSosState('sent');
+    } catch (error) {
+      // Fallback if location fails
+      console.warn('Geolocation failed, using fallback.', error);
+      const mesh = !navigator.onLine;
+      setUsedMesh(mesh);
+      triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https'); // Default KWASU coordinates
+      setSosState('sent');
+    }
 
     setTimeout(() => setSosState('idle'), 5000);
   };

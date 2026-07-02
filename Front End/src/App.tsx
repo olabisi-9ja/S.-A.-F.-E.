@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { Navbar } from './components/layout/Navbar';
@@ -21,80 +22,105 @@ import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage';
 import { AdminMapPage } from './pages/admin/AdminMapPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 
-const ADMIN_PAGES = ['admin-dashboard', 'admin-incidents', 'admin-analytics', 'admin-map', 'admin-users'];
-const USER_PAGES = ['home', 'report', 'my-incidents', 'alerts'];
-const ALL_PAGES = [...ADMIN_PAGES, ...USER_PAGES];
+function ProtectedRoute({ children, requireAdmin = false }: { children: React.ReactNode, requireAdmin?: boolean }) {
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const location = useLocation();
 
-function Router() {
-  const { isAuthenticated, user } = useAuth();
-  const [page, setPage] = useState('login');
-
-  const isAdmin = user?.role === 'security_admin' || user?.role === 'super_admin';
-
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      setPage(isAdmin ? 'admin-dashboard' : 'home');
-    } else {
-      setPage('login');
-    }
-  }, [isAuthenticated, user, isAdmin]);
-
-  const navigate = (p: string) => setPage(p);
-
-  // Unauthenticated routes
-  if (!isAuthenticated) {
-    if (page === 'admin-login') return <AdminLoginPage onNavigate={navigate} />;
-    if (page === 'register') return <RegisterPage onNavigate={navigate} />;
-    return <LoginPage onNavigate={navigate} />;
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  const renderPage = () => {
-    // Admin pages
-    if (isAdmin) {
-      if (page === 'admin-dashboard') return <AdminDashboard onNavigate={navigate} />;
-      if (page === 'admin-incidents') return <AdminIncidentsPage onNavigate={navigate} />;
-      if (page === 'admin-analytics') return <AdminAnalyticsPage />;
-      if (page === 'admin-map') return <AdminMapPage />;
-      if (page === 'admin-users') return <AdminUsersPage />;
-    }
+  if (!isAuthenticated || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
 
-    // User pages
-    if (!isAdmin) {
-      if (page === 'home') return <HomePage onNavigate={navigate} />;
-      if (page === 'report') return <ReportPage onNavigate={navigate} />;
-      if (page === 'my-incidents') return <MyIncidentsPage onNavigate={navigate} />;
-    }
+  const isAdmin = user.role === 'security_admin' || user.role === 'super_admin';
 
-    // Shared
-    if (page === 'alerts') return <AlertsPage />;
+  if (requireAdmin && !isAdmin) {
+    return <Navigate to="/home" replace />;
+  }
 
-    // Fallback
-    if (!ALL_PAGES.includes(page)) {
-      return (
-        <div className="min-h-screen bg-gray-50 pt-14 flex items-center justify-center">
-          <div className="text-center text-gray-500">
-            <p className="text-lg font-semibold">Page not found</p>
-            <button
-              onClick={() => navigate(isAdmin ? 'admin-dashboard' : 'home')}
-              className="mt-3 text-red-700 hover:underline text-sm"
-            >
-              Return to dashboard
-            </button>
-          </div>
-        </div>
-      );
-    }
+  if (!requireAdmin && isAdmin) {
+    return <Navigate to="/admin" replace />;
+  }
 
-    return null;
-  };
+  return <>{children}</>;
+}
+
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (isAuthenticated && user) {
+    const isAdmin = user.role === 'security_admin' || user.role === 'super_admin';
+    return <Navigate to={isAdmin ? '/admin' : '/home'} replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AppLayout({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+  // Strip leading slash for the navbar current page prop to match old behavior
+  const currentPage = location.pathname.substring(1) || 'home';
+  const navigate = useNavigate();
 
   return (
     <div className="font-sans antialiased">
-      <Navbar currentPage={page} onNavigate={navigate} />
+      <Navbar currentPage={currentPage} onNavigate={(path) => navigate(`/${path}`)} />
       <main>
-        {renderPage()}
+        {children}
       </main>
     </div>
+  );
+}
+
+function PageWrapper({ component: Component }: { component: any }) {
+  const navigate = useNavigate();
+  return <Component onNavigate={(path: string) => navigate(`/${path}`)} />;
+}
+
+function Router() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/login" element={<PublicRoute><PageWrapper component={LoginPage} /></PublicRoute>} />
+        <Route path="/admin-login" element={<PublicRoute><PageWrapper component={AdminLoginPage} /></PublicRoute>} />
+        <Route path="/register" element={<PublicRoute><PageWrapper component={RegisterPage} /></PublicRoute>} />
+        
+        {/* Redirect root to appropriate dashboard/login */}
+        <Route path="/" element={<Navigate to="/home" replace />} />
+
+        {/* User Protected Routes */}
+        <Route path="/home" element={<ProtectedRoute><AppLayout><PageWrapper component={HomePage} /></AppLayout></ProtectedRoute>} />
+        <Route path="/report" element={<ProtectedRoute><AppLayout><PageWrapper component={ReportPage} /></AppLayout></ProtectedRoute>} />
+        <Route path="/my-incidents" element={<ProtectedRoute><AppLayout><PageWrapper component={MyIncidentsPage} /></AppLayout></ProtectedRoute>} />
+        <Route path="/alerts" element={<ProtectedRoute><AppLayout><AlertsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/chat/:id" element={<ProtectedRoute><AppLayout><PageWrapper component={MyIncidentsPage} /></AppLayout></ProtectedRoute>} />
+
+        {/* Admin Protected Routes */}
+        <Route path="/admin" element={<ProtectedRoute requireAdmin><AppLayout><PageWrapper component={AdminDashboard} /></AppLayout></ProtectedRoute>} />
+        <Route path="/admin-dashboard" element={<Navigate to="/admin" replace />} />
+        <Route path="/admin-incidents" element={<ProtectedRoute requireAdmin><AppLayout><PageWrapper component={AdminIncidentsPage} /></AppLayout></ProtectedRoute>} />
+        <Route path="/admin-analytics" element={<ProtectedRoute requireAdmin><AppLayout><AdminAnalyticsPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/admin-map" element={<ProtectedRoute requireAdmin><AppLayout><AdminMapPage /></AppLayout></ProtectedRoute>} />
+        <Route path="/admin-users" element={<ProtectedRoute requireAdmin><AppLayout><AdminUsersPage /></AppLayout></ProtectedRoute>} />
+
+        {/* 404 Fallback */}
+        <Route path="*" element={
+          <div className="min-h-screen bg-gray-50 pt-14 flex items-center justify-center">
+            <div className="text-center text-gray-500">
+              <p className="text-lg font-semibold">Page not found</p>
+              <a href="/" className="mt-3 text-red-700 hover:underline text-sm block">Return to home</a>
+            </div>
+          </div>
+        } />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
