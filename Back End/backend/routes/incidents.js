@@ -5,6 +5,7 @@ import {
   getIncidentById,
   updateIncident,
   getIncidentStats,
+  getUploadUrl,
 } from '../controllers/incidentController.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 
@@ -12,6 +13,9 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(authMiddleware);
+
+// Get S3 Presigned URL for uploads
+router.get('/upload-url', getUploadUrl);
 
 // Create incident (students/staff)
 router.post('/', createIncident);

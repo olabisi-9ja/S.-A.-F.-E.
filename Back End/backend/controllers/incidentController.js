@@ -3,6 +3,26 @@ import axios from 'axios';
 import { Incident, User, Message, Notification } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
 import logger from '../utils/logger.js';
+import { generateUploadURL } from '../services/s3Service.js';
+
+export const getUploadUrl = async (req, res) => {
+  try {
+    const { fileType } = req.query;
+    if (!fileType) {
+      return res.status(400).json({ success: false, error: 'fileType query param is required.' });
+    }
+    
+    const { uploadUrl, publicUrl, key } = await generateUploadURL(fileType);
+    
+    res.json({
+      success: true,
+      data: { uploadUrl, publicUrl, key }
+    });
+  } catch (error) {
+    logger.error('Error getting upload URL:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate upload URL.' });
+  }
+};
 
 // AI Classification Service
 async function classifyIncident(description) {
