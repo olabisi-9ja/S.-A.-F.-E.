@@ -2,7 +2,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { Brain, TrendingUp, MapPin, AlertTriangle } from 'lucide-react';
+import { Brain, TrendingUp, MapPin, AlertTriangle, Activity, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { getRealHotspots } from '../../utils/mapUtils';
@@ -23,15 +23,18 @@ export function AdminAnalyticsPage() {
     <div className="min-h-screen bg-gray-50 pt-14">
       <div className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <div>
+          <button onClick={() => window.location.href = '/admin-dashboard'} className="inline-flex items-center gap-1 text-sm text-red-700 hover:bg-red-50 px-2 py-1 -ml-2 rounded-lg transition font-medium mb-3">
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <Brain className="w-5 h-5 text-blue-600" />
+            <Activity className="w-5 h-5 text-blue-600" />
             AI Analytics Panel
           </h2>
           <p className="text-sm text-gray-500">DBSCAN-powered predictive analysis and incident intelligence.</p>
         </div>
 
-        {/* Summary cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Top stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { label: 'Total Incidents', value: totalIncidents, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50' },
             { label: 'Avg. AI Severity', value: `${avgSeverity}/100`, icon: Brain, color: 'text-blue-600', bg: 'bg-blue-50' },

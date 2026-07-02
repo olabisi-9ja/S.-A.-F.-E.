@@ -1,4 +1,4 @@
-import { MapPin, Radio, AlertTriangle } from 'lucide-react';
+import { MapPin, Radio, AlertTriangle, ArrowLeft } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -19,14 +19,17 @@ export function AdminMapPage() {
   const realHotspots = getRealHotspots(incidents);
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-14">
-      <div className="max-w-6xl mx-auto px-4 py-6 space-y-5">
+    <div className="min-h-screen bg-gray-50 pt-14 flex flex-col">
+      <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 space-y-5 flex flex-col h-full">
         <div>
+          <button onClick={() => window.location.href = '/admin-dashboard'} className="inline-flex items-center gap-1 text-sm text-red-700 hover:bg-red-50 px-2 py-1 -ml-2 rounded-lg transition font-medium mb-3">
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-red-700" />
-            Campus Map — Live View
+            <MapPin className="w-5 h-5 text-red-600" />
+            Live Campus Map
           </h2>
-          <p className="text-sm text-gray-500">Real-time incident markers and AI predictive heatmap overlay.</p>
+          <p className="text-sm text-gray-500">Real-time visualization of incidents and active patrols.</p>
         </div>
 
         {/* Legend */}

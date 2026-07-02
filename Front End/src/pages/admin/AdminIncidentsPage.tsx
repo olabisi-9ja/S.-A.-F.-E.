@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, MessageSquare, MapPin, Brain, UserCheck } from 'lucide-react';
+import { Search, Filter, MessageSquare, MapPin, Brain, UserCheck, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -54,6 +54,9 @@ export function AdminIncidentsPage({ onNavigate: _onNavigate }: AdminIncidentsPa
     <div className="min-h-screen bg-gray-50 pt-14">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
         <div>
+          <button onClick={() => _onNavigate('admin-dashboard')} className="inline-flex items-center gap-1 text-sm text-red-700 hover:bg-red-50 px-2 py-1 -ml-2 rounded-lg transition font-medium mb-3">
+            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          </button>
           <h2 className="text-xl font-bold text-gray-900">Incident Management</h2>
           <p className="text-sm text-gray-500">Review, assign, and close all reported incidents.</p>
         </div>
@@ -70,7 +73,7 @@ export function AdminIncidentsPage({ onNavigate: _onNavigate }: AdminIncidentsPa
               className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {['all', ...STATUS_OPTIONS].map(s => (
               <button
                 key={s}
