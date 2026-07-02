@@ -1,5 +1,6 @@
 import { Message, Incident, User, Notification } from '../models/index.js';
 import { Op } from 'sequelize';
+import logger from '../utils/logger.js';
 
 export const sendMessage = async (req, res) => {
   try {
@@ -81,7 +82,7 @@ export const sendMessage = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Send message error:', error);
+    logger.error('Send message error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to send message.' 
@@ -130,7 +131,7 @@ export const getMessages = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get messages error:', error);
+    logger.error('Get messages error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch messages.' 
@@ -160,7 +161,7 @@ export const markMessageRead = async (req, res) => {
       message: 'Message marked as read.',
     });
   } catch (error) {
-    console.error('Mark read error:', error);
+    logger.error('Mark read error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to mark message as read.' 

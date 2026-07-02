@@ -9,6 +9,11 @@ import cron from 'node-cron';
 // Load environment variables
 dotenv.config();
 
+import { Op } from 'sequelize';
+import { createClient } from 'redis';
+import { createAdapter } from '@socket.io/redis-adapter';
+import logger from './utils/logger.js';
+
 // Import database and models
 import { testConnection, syncModels } from './config/database.js';
 import { User, Incident, Alert, Message, MeshPacket, Notification } from './models/index.js';
@@ -75,18 +80,18 @@ app.use('/api/analytics', analyticsRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log(` Client connected: ${socket.id}`);
+  logger.info(` Client connected: ${socket.id}`);
 
   // Join incident room for real-time chat
   socket.on('join_incident', (incidentId) => {
     socket.join(`incident_${incidentId}`);
-    console.log(`User ${socket.id} joined incident_${incidentId}`);
+    logger.info(`User ${socket.id} joined incident_${incidentId}`);
   });
 
   // Leave incident room
   socket.on('leave_incident', (incidentId) => {
     socket.leave(`incident_${incidentId}`);
-    console.log(`User ${socket.id} left incident_${incidentId}`);
+    logger.info(`User ${socket.id} left incident_${incidentId}`);
   });
 
   // Typing indicator
@@ -101,12 +106,12 @@ io.on('connection', (socket) => {
 
   // Disconnect
   socket.on('disconnect', () => {
-    console.log(` Client disconnected: ${socket.id}`);
+    logger.info(` Client disconnected: ${socket.id}`);
   });
 
   // Error handling
   socket.on('error', (error) => {
-    console.error(`Socket error for ${socket.id}:`, error);
+    logger.error(`Socket error for ${socket.id}:`, error);
   });
 });
 
@@ -120,9 +125,9 @@ cron.schedule('0 2 * * *', async () => {
       { is_read: true, read_at: new Date() },
       { where: { is_read: false, created_at: { [Op.lt]: thirtyDaysAgo } } }
     );
-    console.log(`📅 Cleaned up ${result[0]} old notifications`);
+    logger.info(`📅 Cleaned up ${result[0]} old notifications`);
   } catch (error) {
-    console.error('Cron job failed (notification cleanup):', error);
+    logger.error('Cron job failed (notification cleanup):', error);
   }
 });
 
@@ -152,19 +157,18 @@ cron.schedule('0 * * * *', async () => {
     }
 
     if (unackAlerts.length > 0) {
-      console.log(` Sent ${unackAlerts.length} overdue alert SMS notifications`);
+      logger.info(` Sent ${unackAlerts.length} overdue alert SMS notifications`);
     }
   } catch (error) {
-    console.error('Cron job failed (alert check):', error);
+    logger.error('Cron job failed (alert check):', error);
   }
 });
 
-// Import Op for cron jobs
-import { Op } from 'sequelize';
+// Removed hoisted imports to the top of the file
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  logger.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
     error: process.env.NODE_ENV === 'production' 
@@ -189,16 +193,29 @@ async function startServer() {
     // Test database connection
     const dbConnected = await testConnection();
     if (!dbConnected) {
-      console.error('❌ Cannot start server without database connection');
+      logger.error('❌ Cannot start server without database connection');
       process.exit(1);
     }
 
     // Sync models
     await syncModels();
 
+    // Setup Redis Adapter for Socket.io scaling
+    if (process.env.REDIS_URL) {
+      try {
+        const pubClient = createClient({ url: process.env.REDIS_URL });
+        const subClient = pubClient.duplicate();
+        await Promise.all([pubClient.connect(), subClient.connect()]);
+        io.adapter(createAdapter(pubClient, subClient));
+        logger.info('✅ Socket.io Redis Adapter configured successfully.');
+      } catch (redisError) {
+        logger.error('❌ Failed to configure Socket.io Redis Adapter:', redisError);
+      }
+    }
+
     // Start server
     server.listen(PORT, () => {
-      console.log(`
+      logger.info(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║   ️  S.A.F.E. KWASU Backend Server                      ║
@@ -211,24 +228,24 @@ async function startServer() {
       `);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  logger.info('SIGTERM received. Shutting down gracefully...');
   server.close(() => {
-    console.log('HTTP server closed');
+    logger.info('HTTP server closed');
     process.exit(0);
   });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received. Shutting down gracefully...');
+  logger.info('SIGINT received. Shutting down gracefully...');
   server.close(() => {
-    console.log('HTTP server closed');
+    logger.info('HTTP server closed');
     process.exit(0);
   });
 });

@@ -2,6 +2,7 @@ import { Op, Sequelize } from 'sequelize';
 import axios from 'axios';
 import { Incident, User, Message, Notification } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
+import logger from '../utils/logger.js';
 
 // AI Classification Service
 async function classifyIncident(description) {
@@ -17,7 +18,7 @@ async function classifyIncident(description) {
       ai_is_suspicious: response.data.is_suspicious || false,
     };
   } catch (error) {
-    console.log('AI service unavailable, using defaults:', error.message);
+    logger.info('AI service unavailable, using defaults:', error.message);
     // Default classification based on keywords
     const lowerDesc = description.toLowerCase();
     let category = 'General';
@@ -119,7 +120,7 @@ export const createIncident = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Create incident error:', error);
+    logger.error('Create incident error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to create incident.' 
@@ -164,7 +165,7 @@ export const getIncidents = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get incidents error:', error);
+    logger.error('Get incidents error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch incidents.' 
@@ -209,7 +210,7 @@ export const getIncidentById = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get incident error:', error);
+    logger.error('Get incident error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch incident.' 
@@ -276,7 +277,7 @@ export const updateIncident = async (req, res) => {
       data: { incident },
     });
   } catch (error) {
-    console.error('Update incident error:', error);
+    logger.error('Update incident error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to update incident.' 
@@ -323,7 +324,7 @@ export const getIncidentStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get stats error:', error);
+    logger.error('Get stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch statistics.' 

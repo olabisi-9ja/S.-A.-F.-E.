@@ -1,6 +1,7 @@
 import { Op } from 'sequelize';
 import { Alert, User, Notification, MeshPacket } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
+import logger from '../utils/logger.js';
 
 export const triggerAlert = async (req, res) => {
   try {
@@ -72,7 +73,7 @@ export const triggerAlert = async (req, res) => {
           }
         }
       } catch (smsError) {
-        console.error('SMS fallback failed:', smsError.message);
+        logger.error('SMS fallback failed:', smsError.message);
       }
     }, 15000);
 
@@ -92,7 +93,7 @@ export const triggerAlert = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Trigger alert error:', error);
+    logger.error('Trigger alert error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to trigger emergency alert.' 
@@ -155,7 +156,7 @@ export const acknowledgeAlert = async (req, res) => {
       message: 'Alert acknowledged successfully.',
     });
   } catch (error) {
-    console.error('Acknowledge alert error:', error);
+    logger.error('Acknowledge alert error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to acknowledge alert.' 
@@ -214,7 +215,7 @@ export const resolveAlert = async (req, res) => {
       message: 'Alert resolved successfully.',
     });
   } catch (error) {
-    console.error('Resolve alert error:', error);
+    logger.error('Resolve alert error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to resolve alert.' 
@@ -260,7 +261,7 @@ export const getAlerts = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get alerts error:', error);
+    logger.error('Get alerts error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch alerts.' 
@@ -289,7 +290,7 @@ export const getActiveAlerts = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get active alerts error:', error);
+    logger.error('Get active alerts error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch active alerts.' 

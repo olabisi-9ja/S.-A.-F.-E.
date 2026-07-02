@@ -1,4 +1,5 @@
 import axios from 'axios';
+import logger from '../utils/logger.js';
 
 /**
  * Send SMS via Termii API (Nigerian SMS Gateway)
@@ -34,10 +35,10 @@ export async function sendSMS(to, message) {
       }
     );
 
-    console.log('SMS sent successfully:', response.data);
+    logger.info('SMS sent successfully:', response.data);
     return { success: true, data: response.data };
   } catch (error) {
-    console.error('SMS sending failed:', error.response?.data || error.message);
+    logger.error('SMS sending failed:', error.response?.data || error.message);
     return { 
       success: false, 
       error: error.response?.data?.error || error.message 

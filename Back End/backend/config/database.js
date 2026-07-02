@@ -2,6 +2,7 @@ import { Sequelize } from 'sequelize';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -15,6 +16,20 @@ if (dialect === 'sqlite') {
     dialect: 'sqlite',
     storage: path.join(__dirname, '..', 'safe_dev.sqlite'),
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  });
+} else if (process.env.DATABASE_URL) {
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    dialectOptions: {
+      ssl: process.env.NODE_ENV === 'production' ? { require: true, rejectUnauthorized: false } : false
+    },
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    pool: {
+      max: 10,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
   });
 } else {
   sequelize = new Sequelize(
@@ -40,10 +55,10 @@ if (dialect === 'sqlite') {
 export async function testConnection() {
   try {
     await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
+    logger.info('✅ Database connection established successfully.');
     return true;
   } catch (error) {
-    console.error('❌ Unable to connect to the database:', error.message);
+    logger.error('❌ Unable to connect to the database:', error.message);
     return false;
   }
 }
@@ -52,9 +67,9 @@ export async function testConnection() {
 export async function syncModels() {
   try {
     await sequelize.sync({ alter: false });
-    console.log('✅ Database models synchronized.');
+    logger.info('✅ Database models synchronized.');
   } catch (error) {
-    console.error('❌ Error syncing models:', error.message);
+    logger.error('❌ Error syncing models:', error.message);
   }
 }
 

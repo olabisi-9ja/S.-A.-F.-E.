@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { Alert, MeshPacket, User, Notification } from '../models/index.js';
 import { Op, Sequelize } from 'sequelize';
+import logger from '../utils/logger.js';
 
 const MESH_ENCRYPTION_KEY = process.env.MESH_ENCRYPTION_KEY || 'SAFE_MESH_KEY_32_CHARACTERS_LONG';
 
@@ -12,7 +13,7 @@ function decryptPayload(encryptedPayload) {
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
   } catch (error) {
-    console.error('Decryption failed:', error.message);
+    logger.error('Decryption failed:', error.message);
     throw new Error('Invalid encrypted payload');
   }
 }
@@ -125,7 +126,7 @@ export const syncMeshPacket = async (req, res) => {
           }
         }
       } catch (smsError) {
-        console.error('SMS fallback failed:', smsError.message);
+        logger.error('SMS fallback failed:', smsError.message);
       }
     }, 15000);
 
@@ -149,7 +150,7 @@ export const syncMeshPacket = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Sync mesh packet error:', error);
+    logger.error('Sync mesh packet error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to sync mesh packet.' 
@@ -179,7 +180,7 @@ export const getMeshPackets = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get mesh packets error:', error);
+    logger.error('Get mesh packets error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch mesh packets.' 
@@ -204,7 +205,7 @@ export const getMeshStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get mesh stats error:', error);
+    logger.error('Get mesh stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch mesh statistics.' 

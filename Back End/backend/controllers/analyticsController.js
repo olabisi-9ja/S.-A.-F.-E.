@@ -1,6 +1,7 @@
 import { Incident, Alert, User } from '../models/index.js';
 import { Op, fn, col } from 'sequelize';
 import { dateDiffSeconds, dateTrunc } from '../config/dialectHelpers.js';
+import logger from '../utils/logger.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -110,7 +111,7 @@ export const getDashboardStats = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get dashboard stats error:', error);
+    logger.error('Get dashboard stats error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch dashboard statistics.' 
@@ -197,7 +198,7 @@ export const getHotspots = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Get hotspots error:', error);
+    logger.error('Get hotspots error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to generate hotspot data.' 
@@ -227,7 +228,7 @@ export const getIncidentTrend = async (req, res) => {
       data: { trend },
     });
   } catch (error) {
-    console.error('Get trend error:', error);
+    logger.error('Get trend error:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to fetch trend data.' 
