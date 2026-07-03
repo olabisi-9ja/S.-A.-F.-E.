@@ -105,10 +105,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         </div>
       </div>
 
-      {/* Demo hint */}
-      <div className="mt-4 text-red-200 text-xs text-center space-y-1">
-        <p>Demo: <span className="text-white font-semibold">adewale@kwasu.edu.ng</span> / password</p>
-      </div>
+
     </div>
   );
 }

@@ -89,9 +89,7 @@ export function AdminLoginPage({ onNavigate }: AdminLoginPageProps) {
           </form>
         </div>
 
-        <div className="mt-4 text-red-200 text-xs text-center">
-          Demo: <span className="text-white font-semibold">security@kwasu.edu.ng</span> / safe-admin
-        </div>
+
       </div>
     </div>
   );
