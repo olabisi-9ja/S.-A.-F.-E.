@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AppProvider } from './context/AppContext';
 import { Navbar } from './components/layout/Navbar';
 
+// Public pages
+import { LandingPage } from './pages/LandingPage';
+
 // Auth pages
 import { LoginPage } from './pages/auth/LoginPage';
 import { AdminLoginPage } from './pages/auth/AdminLoginPage';
@@ -91,14 +94,14 @@ function Router() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<PublicRoute><PageWrapper component={LandingPage} /></PublicRoute>} />
+        
         {/* Public Routes */}
         <Route path="/login" element={<PublicRoute><PageWrapper component={LoginPage} /></PublicRoute>} />
         <Route path="/admin-login" element={<PublicRoute><PageWrapper component={AdminLoginPage} /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><PageWrapper component={RegisterPage} /></PublicRoute>} />
         <Route path="/auth/verify" element={<PublicRoute><PageWrapper component={VerifyEmailPage} /></PublicRoute>} />
-        
-        {/* Redirect root to appropriate dashboard/login */}
-        <Route path="/" element={<Navigate to="/home" replace />} />
 
         {/* User Protected Routes */}
         <Route path="/home" element={<ProtectedRoute><AppLayout><PageWrapper component={HomePage} /></AppLayout></ProtectedRoute>} />
