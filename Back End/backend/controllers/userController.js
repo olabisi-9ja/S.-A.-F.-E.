@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { User } from '../models/index.js';
 import logger from '../utils/logger.js';
 
@@ -28,19 +27,17 @@ export const createUser = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email already exists' });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     const newUser = await User.create({
       full_name,
       institutional_email,
       matric_or_staff_id,
       role,
-      password: hashedPassword,
+      password_hash: password,
+      email_verified: true, // Admin-created users are pre-verified
     });
 
     const userResponse = newUser.toJSON();
-    delete userResponse.password;
+    delete userResponse.password_hash;
 
     res.status(201).json({ success: true, data: { user: userResponse } });
   } catch (error) {
@@ -62,14 +59,13 @@ export const updateUser = async (req, res) => {
     const updateData = { full_name, institutional_email, matric_or_staff_id, role };
 
     if (password) {
-      const salt = await bcrypt.genSalt(10);
-      updateData.password = await bcrypt.hash(password, salt);
+      updateData.password_hash = password;
     }
 
     await user.update(updateData);
 
     const userResponse = user.toJSON();
-    delete userResponse.password;
+    delete userResponse.password_hash;
 
     res.json({ success: true, data: { user: userResponse } });
   } catch (error) {
