@@ -69,7 +69,7 @@ export async function testConnection() {
 // Sync models
 export async function syncModels() {
   try {
-    await sequelize.sync({ alter: false });
+    await sequelize.sync({ alter: true });
     logger.info('✅ Database models synchronized.');
   } catch (error) {
     logger.error('❌ Error syncing models:', error.message);
