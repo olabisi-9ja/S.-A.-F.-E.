@@ -7,6 +7,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (idToken: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshProfile: () => Promise<void>;
@@ -60,6 +61,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: false, error: result.error || 'Invalid email or password.' };
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const result = await authAPI.googleLogin(idToken);
+    
+    if (result.success && result.data) {
+      localStorage.setItem('safe_token', result.data.token);
+      if (result.data.refreshToken) {
+        localStorage.setItem('safe_refresh_token', result.data.refreshToken);
+      }
+      setUser(result.data.user);
+      return { success: true };
+    }
+
+    return { success: false, error: result.error || 'Google login failed.' };
+  }, []);
+
   const register = useCallback(async (data: RegisterData) => {
     const result = await authAPI.register(data);
     
@@ -96,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAuthenticated: !!user, 
       isLoading,
       login, 
+      loginWithGoogle,
       register, 
       logout,
       refreshProfile,

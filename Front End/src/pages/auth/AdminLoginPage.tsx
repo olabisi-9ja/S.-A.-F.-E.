@@ -57,7 +57,7 @@ export function AdminLoginPage({ onNavigate }: AdminLoginPageProps) {
             <Input
               label="Work Email"
               type="email"
-              placeholder="security@kwasu.edu.ng"
+              placeholder="e.g., admin.name@kwasu.edu.ng"
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
@@ -65,7 +65,7 @@ export function AdminLoginPage({ onNavigate }: AdminLoginPageProps) {
             <Input
               label="Security Key"
               type={showPass ? 'text' : 'password'}
-              placeholder="safe-admin"
+              placeholder="Enter your secure password"
               value={password}
               onChange={e => setPassword(e.target.value)}
               icon={<Lock className="w-4 h-4" />}

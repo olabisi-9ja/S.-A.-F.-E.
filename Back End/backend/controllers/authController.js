@@ -4,6 +4,9 @@ import { User } from '../models/index.js';
 import validator from 'validator';
 import logger from '../utils/logger.js';
 import { sendVerificationEmail } from '../services/emailService.js';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
@@ -219,3 +222,63 @@ export const updateProfile = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to update profile.' });
   }
 };
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ success: false, error: 'Google ID token is required.' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    
+    const payload = ticket.getPayload();
+    const { email, name, sub: google_id } = payload;
+
+    let user = await User.findOne({ where: { institutional_email: email } });
+
+    if (user) {
+      // If user exists but doesn't have google_id, link it
+      if (!user.google_id) {
+        user.google_id = google_id;
+        user.auth_provider = 'google';
+        user.email_verified = true;
+        await user.save();
+      }
+    } else {
+      // Create new user if they don't exist
+      user = await User.create({
+        full_name: name,
+        institutional_email: email,
+        google_id: google_id,
+        auth_provider: 'google',
+        role: 'standard_user',
+        email_verified: true, // Google verifies emails inherently
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ success: false, error: 'Account is deactivated.' });
+    }
+
+    user.last_login = new Date();
+    const refreshToken = generateRefreshToken(user.id);
+    user.refresh_token = refreshToken;
+    await user.save();
+
+    const jwtToken = generateToken(user.id);
+
+    res.json({
+      success: true,
+      message: 'Google login successful.',
+      data: { user, token: jwtToken, refreshToken },
+    });
+  } catch (error) {
+    logger.error('Google login error:', error);
+    res.status(500).json({ success: false, error: 'Google login failed.' });
+  }
+};
+

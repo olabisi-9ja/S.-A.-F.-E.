@@ -3,6 +3,7 @@ import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { OAuthButtons } from '../../components/auth/OAuthButtons';
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
@@ -42,7 +43,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
           <Input
             label="University Email"
             type="email"
-            placeholder="adewale@kwasu.edu.ng"
+            placeholder="e.g., student@kwasu.edu.ng"
             value={email}
             onChange={e => setEmail(e.target.value)}
             icon={<Mail className="w-4 h-4" />}
@@ -51,7 +52,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
           <Input
             label="Secure Password"
             type={showPass ? 'text' : 'password'}
-            placeholder="password"
+            placeholder="Enter your secure password"
             value={password}
             onChange={e => setPassword(e.target.value)}
             icon={<Lock className="w-4 h-4" />}

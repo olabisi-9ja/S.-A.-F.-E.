@@ -42,9 +42,16 @@ async function apiRequest<T>(
 
 export const authAPI = {
   login: async (email: string, password: string) => {
-    return await apiRequest<{ user: User; token: string }>('/auth/login', {
+    return await apiRequest<{ user: User; token: string; refreshToken?: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ institutional_email: email, password }),
+    });
+  },
+
+  googleLogin: async (token: string) => {
+    return await apiRequest<{ user: User; token: string; refreshToken?: string }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
     });
   },
 

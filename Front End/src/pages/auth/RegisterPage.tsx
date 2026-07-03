@@ -3,6 +3,7 @@ import { Shield, ArrowLeft, User, Mail, Phone, Lock, Eye, EyeOff, Hash } from 'l
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { OAuthButtons } from '../../components/auth/OAuthButtons';
 
 interface RegisterPageProps {
   onNavigate: (page: string) => void;
