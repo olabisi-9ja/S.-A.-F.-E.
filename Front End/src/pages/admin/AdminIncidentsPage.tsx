@@ -44,9 +44,9 @@ export function AdminIncidentsPage({ onNavigate: _onNavigate }: AdminIncidentsPa
     .filter(i => filterStatus === 'all' || i.status === filterStatus)
     .filter(i =>
       search === '' ||
-      i.category.toLowerCase().includes(search.toLowerCase()) ||
-      i.description.toLowerCase().includes(search.toLowerCase()) ||
-      i.reporter_name.toLowerCase().includes(search.toLowerCase())
+      (i.category || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.description || '').toLowerCase().includes(search.toLowerCase()) ||
+      (i.reporter_name || '').toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 

@@ -59,8 +59,8 @@ export function AdminUsersPage() {
     .filter(u => filter === 'all' || u.role === filter)
     .filter(u =>
       search === '' ||
-      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
-      u.institutional_email.toLowerCase().includes(search.toLowerCase())
+      (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.institutional_email || '').toLowerCase().includes(search.toLowerCase())
     );
 
   return (
