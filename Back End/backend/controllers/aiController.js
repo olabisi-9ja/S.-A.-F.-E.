@@ -6,8 +6,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // Initialize the Google Gen AI client
+const rawApiKey = process.env.GEMINI_API_KEY || 'dummy_key_if_not_provided';
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || 'dummy_key_if_not_provided'
+  apiKey: rawApiKey.replace(/^"|"$/g, '')
 });
 
 export const chatWithAI = async (req, res) => {
