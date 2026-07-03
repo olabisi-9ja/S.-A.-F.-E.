@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, Sparkles } from 'lucide-react';
+import { Bot, X, Send, Sparkles, Mic, MicOff } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { aiAPI } from '../services/api';
 
@@ -10,12 +10,18 @@ interface ChatMessage {
   timestamp: Date;
 }
 
+// Ensure SpeechRecognition is available for TS
+const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+
 export function AiChatbot() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  const recognitionRef = useRef<any>(null);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -116,6 +122,49 @@ export function AiChatbot() {
     }
   };
 
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+    
+    if (!SpeechRecognitionAPI) {
+      alert("Your browser does not support Voice-to-Text capabilities.");
+      return;
+    }
+
+    if (!recognitionRef.current) {
+      recognitionRef.current = new SpeechRecognitionAPI();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = false; // Get final words to avoid jumping text
+      
+      recognitionRef.current.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setInputText(prev => prev ? prev + ' ' + finalTranscript : finalTranscript);
+        }
+      };
+
+      recognitionRef.current.onerror = (event: any) => {
+        console.error("Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current.onend = () => {
+        setIsListening(false);
+      };
+    }
+
+    recognitionRef.current.start();
+    setIsListening(true);
+  };
+
   return (
     <>
       {/* Floating Action Button */}
@@ -209,11 +258,23 @@ export function AiChatbot() {
           {/* Input Area */}
           <div className="p-3 bg-white border-t border-gray-100 shrink-0">
             <div className="flex items-end gap-2">
+              <button
+                onClick={toggleListening}
+                className={cn(
+                  "p-2.5 rounded-xl transition shrink-0 border",
+                  isListening 
+                    ? "bg-red-100 text-red-700 border-red-200 animate-pulse" 
+                    : "bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100 hover:text-gray-700"
+                )}
+                title={isListening ? "Stop listening" : "Start Voice-to-Text"}
+              >
+                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </button>
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Ask something..."
+                placeholder={isListening ? "Listening..." : "Ask something..."}
                 className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none max-h-32"
                 rows={1}
               />

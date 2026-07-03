@@ -42,7 +42,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,8 +73,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       refreshData();
+      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
     }
-  }, [isAuthenticated, refreshData]);
+  }, [isAuthenticated, user, refreshData]);
 
   // Initial setup for sockets and offline sync
   useEffect(() => {
@@ -88,6 +91,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (prev.some(m => m.id === msg.id)) return prev;
         return [...prev, msg];
       });
+    });
+
+    socket.on('new_incident', (inc: Incident) => {
+      setIncidents(prev => [inc, ...prev.filter(i => i.id !== inc.id)]);
+      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('New S.A.F.E. Incident', {
+          body: `${inc.category} reported. AI Severity: ${inc.ai_severity_score}`
+        });
+      }
+    });
+
+    socket.on('new_alert', (alert: Alert) => {
+      setAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
+      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('🚨 S.A.F.E. SOS ALERT!', {
+          body: `Emergency triggered by ${alert.user_name}`
+        });
+      }
     });
 
     // Offline sync handler for alerts
@@ -111,9 +132,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       socket.off('new_message');
+      socket.off('new_incident');
+      socket.off('new_alert');
       window.removeEventListener('online', handleOnline);
     };
-  }, [refreshData]);
+  }, [refreshData, user]);
 
   const addIncident = useCallback(async (data: Omit<Incident, 'id' | 'created_at' | 'status' | 'ai_severity_score' | 'ai_category_suggestion'>) => {
     const result = await incidentsAPI.create(data);
