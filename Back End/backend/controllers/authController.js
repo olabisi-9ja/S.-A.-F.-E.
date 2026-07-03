@@ -104,10 +104,10 @@ export const login = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Account is deactivated. Contact security admin.' });
     }
 
-    // Temporarily disabled for MVP until SMTP is configured
-    // if (!user.email_verified && user.role === 'standard_user') {
-    //   return res.status(403).json({ success: false, error: 'Please verify your email before logging in.' });
-    // }
+    // Enforce email verification
+    if (!user.email_verified && user.role === 'standard_user') {
+      return res.status(403).json({ success: false, error: 'Please verify your email before logging in.' });
+    }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {

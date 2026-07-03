@@ -188,7 +188,6 @@ export function AdminUsersPage() {
             </Card>
           ))}
         </div>
-        </div>
       </div>
 
       {showAddModal && (

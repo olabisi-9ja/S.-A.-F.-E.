@@ -22,6 +22,8 @@ export function RegisterPage({ onNavigate }: RegisterPageProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const [success, setSuccess] = useState(false);
+
   const set = (key: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(prev => ({ ...prev, [key]: e.target.value }));
 
@@ -48,8 +50,37 @@ export function RegisterPage({ onNavigate }: RegisterPageProps) {
     });
     setLoading(false);
 
-    if (!result.success) setError(result.error || 'Registration failed.');
+    if (!result.success) {
+      setError(result.error || 'Registration failed.');
+    } else {
+      setSuccess(true);
+    }
   };
+
+  if (success) {
+    return (
+      <div className="min-h-screen bg-white">
+        <div className="h-14 border-b border-gray-100 flex items-center px-5 gap-3">
+          <div className="flex items-center gap-2">
+            <Shield className="w-5 h-5 text-red-700" />
+            <span className="font-bold text-gray-800 tracking-wider text-sm">S.A.F.E.KWASU</span>
+          </div>
+        </div>
+        <div className="max-w-xl mx-auto px-5 py-12 text-center">
+          <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Mail className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Registration Successful!</h2>
+          <p className="text-gray-500 mb-8">
+            We've sent a verification link to <strong>{form.institutional_email}</strong>. Please check your inbox and verify your email to log in.
+          </p>
+          <Button onClick={() => onNavigate('login')} size="lg">
+            Back to Login
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

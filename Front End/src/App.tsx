@@ -8,6 +8,7 @@ import { Navbar } from './components/layout/Navbar';
 import { LoginPage } from './pages/auth/LoginPage';
 import { AdminLoginPage } from './pages/auth/AdminLoginPage';
 import { RegisterPage } from './pages/auth/RegisterPage';
+import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 
 // User pages
 import { HomePage } from './pages/user/HomePage';
@@ -62,6 +63,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+import { AiChatbot } from './components/AiChatbot';
+
 function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   // Strip leading slash for the navbar current page prop to match old behavior
@@ -74,6 +77,7 @@ function AppLayout({ children }: { children: React.ReactNode }) {
       <main>
         {children}
       </main>
+      <AiChatbot />
     </div>
   );
 }
@@ -91,6 +95,7 @@ function Router() {
         <Route path="/login" element={<PublicRoute><PageWrapper component={LoginPage} /></PublicRoute>} />
         <Route path="/admin-login" element={<PublicRoute><PageWrapper component={AdminLoginPage} /></PublicRoute>} />
         <Route path="/register" element={<PublicRoute><PageWrapper component={RegisterPage} /></PublicRoute>} />
+        <Route path="/auth/verify" element={<PublicRoute><PageWrapper component={VerifyEmailPage} /></PublicRoute>} />
         
         {/* Redirect root to appropriate dashboard/login */}
         <Route path="/" element={<Navigate to="/home" replace />} />
