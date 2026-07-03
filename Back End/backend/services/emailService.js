@@ -17,6 +17,12 @@ const transporter = nodemailer.createTransport({
 export const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `http://localhost:5173/auth/verify?token=${token}`;
   
+  // Mock if not configured for production
+  if (!process.env.SMTP_USER || process.env.SMTP_USER === 'test' || process.env.SMTP_USER === 'placeholder') {
+    logger.warn(`SMTP not configured. Mocking verification email to ${to}. Token: ${token}`);
+    return { success: true, mocked: true };
+  }
+
   const mailOptions = {
     from: process.env.EMAIL_FROM || '"S.A.F.E. System" <noreply@safe.kwasu.edu.ng>',
     to,
@@ -40,9 +46,9 @@ export const sendVerificationEmail = async (to, token) => {
   try {
     const info = await transporter.sendMail(mailOptions);
     logger.info(`Verification email sent to ${to}`, { messageId: info.messageId });
-    return true;
+    return { success: true, mocked: false };
   } catch (error) {
     logger.error(`Failed to send verification email to ${to}:`, error);
-    return false;
+    return { success: false, error: error.message };
   }
 };

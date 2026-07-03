@@ -51,7 +51,21 @@ export const register = async (req, res) => {
       email_verified: false,
     });
 
-    await sendVerificationEmail(institutional_email, verificationToken);
+    const emailResult = await sendVerificationEmail(institutional_email, verificationToken);
+
+    if (emailResult && emailResult.mocked) {
+      // Auto-verify if SMTP is not configured so testing can proceed seamlessly
+      user.email_verified = true;
+      user.verification_token = null;
+      await user.save();
+      
+      res.status(201).json({
+        success: true,
+        message: 'Registration successful. You have been auto-verified for testing purposes.',
+        data: { user },
+      });
+      return;
+    }
 
     res.status(201).json({
       success: true,
@@ -104,8 +118,10 @@ export const login = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Account is deactivated. Contact security admin.' });
     }
 
-    // Enforce email verification
-    if (!user.email_verified && user.role === 'standard_user') {
+    // Enforce email verification (unless SMTP is not configured for easy testing)
+    const isSmtpMocked = !process.env.SMTP_USER || process.env.SMTP_USER === 'test' || process.env.SMTP_USER === 'placeholder';
+    
+    if (!user.email_verified && user.role === 'standard_user' && !isSmtpMocked) {
       return res.status(403).json({ success: false, error: 'Please verify your email before logging in.' });
     }
 
