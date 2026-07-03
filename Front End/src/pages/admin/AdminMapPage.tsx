@@ -4,13 +4,25 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { getRealHotspots } from '../../utils/mapUtils';
 
-// Helper to project live lat/lng coordinates to the 800x500 SVG map
-const projectCoords = (lat: number, lng: number) => {
-  // Base coordinate is roughly KWASU center (8.6762, 4.1680) mapped to SVG (400, 250)
-  const x = 400 + (lng - 4.1680) * 160000;
-  const y = 250 - (lat - 8.6762) * 100000; // SVG y is inverted
-  return { cx: Math.max(20, Math.min(780, x)), cy: Math.max(20, Math.min(480, y)) };
-};
+import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+const KWASU_CENTER: [number, number] = [8.6762, 4.1680];
+
+const incidentIcon = (status: string) => L.divIcon({
+  className: 'custom-leaflet-icon',
+  html: `<div style="background-color: ${status === 'in_progress' ? '#d97706' : '#dc2626'}; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">!</div>`,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10]
+});
+
+const alertIcon = L.divIcon({
+  className: 'custom-leaflet-icon',
+  html: `<div style="background-color: #f97316; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 8px; box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.4), 0 2px 4px rgba(0,0,0,0.3);">SOS</div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12]
+});
 
 export function AdminMapPage() {
   const { incidents, alerts } = useApp();
@@ -48,105 +60,75 @@ export function AdminMapPage() {
           ))}
         </div>
 
-        {/* SVG Map */}
+        {/* Interactive Leaflet Map */}
         <Card className="overflow-hidden">
-          <div className="relative bg-[#e8f4e8] rounded-xl overflow-hidden" style={{ height: '500px' }}>
-            {/* Campus map background */}
-            <svg
-              width="100%"
-              height="100%"
-              viewBox="0 0 800 500"
-              className="absolute inset-0"
-              preserveAspectRatio="xMidYMid meet"
+          <div className="relative rounded-xl overflow-hidden" style={{ height: '500px' }}>
+            <MapContainer 
+              center={KWASU_CENTER} 
+              zoom={15} 
+              scrollWheelZoom={true}
+              style={{ height: '100%', width: '100%', zIndex: 0 }}
             >
-              {/* Background */}
-              <rect width="800" height="500" fill="#f0f7f0" />
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              
+              {/* Hotspot Clusters */}
+              {realHotspots.map((spot, i) => (
+                <Circle
+                  key={`hotspot-${i}`}
+                  center={[spot.latitude, spot.longitude]}
+                  radius={spot.count * 20}
+                  pathOptions={{ color: '#8b5cf6', fillColor: '#8b5cf6', fillOpacity: 0.2 }}
+                >
+                  <Popup>
+                    <strong>{spot.label}</strong><br/>
+                    {spot.count} incidents in this cluster
+                  </Popup>
+                </Circle>
+              ))}
 
-              {/* Roads */}
-              <rect x="180" y="0" width="20" height="500" fill="#d4c9a8" opacity="0.7" rx="2" />
-              <rect x="0" y="220" width="800" height="18" fill="#d4c9a8" opacity="0.7" rx="2" />
-              <rect x="400" y="0" width="16" height="500" fill="#d4c9a8" opacity="0.6" rx="2" />
-              <rect x="0" y="360" width="800" height="14" fill="#d4c9a8" opacity="0.5" rx="2" />
-
-              {/* Campus buildings */}
-              <rect x="210" y="60" width="140" height="80" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="280" y="106" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Faculty of ICT</text>
-
-              <rect x="420" y="60" width="120" height="70" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="480" y="100" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Admin Block</text>
-
-              <rect x="210" y="260" width="100" height="65" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="260" y="296" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Library</text>
-
-              <rect x="560" y="260" width="120" height="65" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="620" y="296" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Female Hostel</text>
-
-              <rect x="210" y="390" width="100" height="55" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="260" y="421" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Student Union</text>
-
-              <rect x="420" y="390" width="100" height="55" rx="6" fill="#c8d8c8" stroke="#a0b8a0" strokeWidth="1.5" />
-              <text x="470" y="421" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Cafeteria</text>
-
-              <rect x="580" y="390" width="100" height="55" rx="6" fill="#b8d0b8" stroke="#90a890" strokeWidth="1.5" />
-              <text x="630" y="418" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Security</text>
-              <text x="630" y="431" textAnchor="middle" fontSize="9" fill="#4a6a4a" fontWeight="600">Post</text>
-
-              {/* Green areas */}
-              <ellipse cx="600" cy="130" rx="60" ry="40" fill="#a8c8a8" opacity="0.5" />
-              <text x="600" y="134" textAnchor="middle" fontSize="9" fill="#5a8a5a">Central Park</text>
-
-              {/* Dynamic DBSCAN Hotspot Circles */}
-              {realHotspots.map((spot, i) => {
-                const { cx, cy } = projectCoords(spot.latitude, spot.longitude);
-                // Radius based on count
-                const rOuter = Math.min(60, 25 + spot.count * 3);
-                const rInner = Math.min(30, 10 + spot.count * 1.5);
-                return (
-                  <g key={`hotspot-${i}`}>
-                    <circle cx={cx} cy={cy} r={rOuter} fill="#8b5cf6" opacity="0.15" stroke="#8b5cf6" strokeWidth="1.5" strokeDasharray="4,3" />
-                    <circle cx={cx} cy={cy} r={rInner} fill="#8b5cf6" opacity="0.12" />
-                    <text x={cx} y={cy + rOuter + 8} textAnchor="middle" fontSize="8" fill="#7c3aed" fontWeight="600">{spot.label}</text>
-                  </g>
-                );
-              })}
-
-              {/* Dynamic Incident markers */}
-              {incidents.filter(i => i.status !== 'resolved').map(inc => {
-                if (!inc.latitude || !inc.longitude) return null;
-                const { cx, cy } = projectCoords(inc.latitude, inc.longitude);
-                const isProgress = inc.status === 'in_progress';
-                const color = isProgress ? '#d97706' : '#dc2626'; // amber or red
-                return (
-                  <g key={`inc-${inc.id}`}>
-                    <circle cx={cx} cy={cy} r="8" fill={color} stroke="white" strokeWidth="2" />
-                    <text x={cx} y={cy + 3} textAnchor="middle" fontSize="8" fill="white" fontWeight="700">!</text>
-                    <text x={cx} y={cy - 12} textAnchor="middle" fontSize="8" fill={color} fontWeight="600">#{inc.id} {inc.category}</text>
-                  </g>
-                );
-              })}
-
-              {/* Dynamic Alert markers */}
+              {/* Active Alerts (SOS) */}
               {activeAlerts.map(alert => {
                 if (!alert.latitude || !alert.longitude) return null;
-                const { cx, cy } = projectCoords(alert.latitude, alert.longitude);
                 return (
-                  <g key={`alert-${alert.id}`}>
-                    <circle cx={cx} cy={cy} r="14" fill="none" stroke="#f97316" strokeWidth="2.5" strokeDasharray="3,2" />
-                    <circle cx={cx} cy={cy} r="6" fill="#f97316" />
-                    <text x={cx} y={cy - 18} textAnchor="middle" fontSize="9" fill="#f97316" fontWeight="bold">SOS</text>
-                  </g>
+                  <Marker 
+                    key={`alert-${alert.id}`} 
+                    position={[alert.latitude, alert.longitude]} 
+                    icon={alertIcon}
+                  >
+                    <Popup>
+                      <strong>🚨 SOS Emergency</strong><br/>
+                      User: {alert.user_name}<br/>
+                      Mode: {alert.transmission_mode}
+                    </Popup>
+                  </Marker>
                 );
               })}
 
-              {/* Compass */}
-              <text x="750" y="30" textAnchor="middle" fontSize="16" fill="#4a6a4a" fontWeight="bold">N</text>
-              <line x1="750" y1="35" x2="750" y2="55" stroke="#4a6a4a" strokeWidth="2" />
-              <polygon points="750,35 745,50 750,45 755,50" fill="#4a6a4a" />
-            </svg>
+              {/* Ongoing Incidents */}
+              {incidents.filter(i => i.status !== 'resolved').map(inc => {
+                if (!inc.latitude || !inc.longitude) return null;
+                return (
+                  <Marker 
+                    key={`inc-${inc.id}`} 
+                    position={[inc.latitude, inc.longitude]} 
+                    icon={incidentIcon(inc.status)}
+                  >
+                    <Popup>
+                      <strong>{inc.category}</strong><br/>
+                      Status: {inc.status}<br/>
+                      AI Severity: {inc.ai_severity_score}
+                    </Popup>
+                  </Marker>
+                );
+              })}
+            </MapContainer>
 
             {/* Map label */}
-            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-700 shadow">
-              Kwara State University, Malete Campus
+            <div className="absolute bottom-3 left-3 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-700 shadow z-[1000] pointer-events-none">
+              Kwara State University, Malete Campus (Live)
             </div>
           </div>
         </Card>

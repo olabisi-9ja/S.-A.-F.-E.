@@ -39,7 +39,7 @@ export function OAuthButtons({ onError, isLoading }: OAuthButtonsProps) {
       {loading ? (
         <div className="text-sm text-gray-500 py-2">Connecting...</div>
       ) : (
-        <div className="w-full relative z-20">
+        <div className="w-full relative z-20 flex justify-center">
           <GoogleLogin
             onSuccess={handleSuccess}
             onError={() => onError?.('Google login was cancelled or failed.')}
@@ -48,6 +48,7 @@ export function OAuthButtons({ onError, isLoading }: OAuthButtonsProps) {
             width="100%"
             text="signin_with"
             shape="rectangular"
+            logo_alignment="center"
           />
         </div>
       )}
