@@ -176,7 +176,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                           {new Date(inc.created_at).toLocaleDateString()}
                         </span>
                         <button
-                          onClick={e => { e.stopPropagation(); onNavigate('chat-' + inc.id); }}
+                          onClick={e => { e.stopPropagation(); onNavigate('chat/' + inc.id); }}
                           className="flex items-center gap-1 text-xs text-red-700 hover:underline font-medium"
                         >
                           <MessageSquare className="w-3 h-3" /> Chat

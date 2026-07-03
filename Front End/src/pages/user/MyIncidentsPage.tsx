@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { MessageSquare, MapPin, Brain, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
@@ -44,8 +45,18 @@ export function MyIncidentsPage({ onNavigate: _onNavigate }: MyIncidentsPageProp
   const { user } = useAuth();
   const { incidents, getIncidentMessages, sendMessage } = useApp();
   const [chatIncident, setChatIncident] = useState<Incident | null>(null);
+  const { id } = useParams();
 
   const myIncidents = incidents.filter(i => i.reporter_id === (user?.id ?? 99));
+
+  useEffect(() => {
+    if (id && incidents.length > 0) {
+      const incident = incidents.find(i => i.id === Number(id));
+      if (incident) {
+        setChatIncident(incident);
+      }
+    }
+  }, [id, incidents]);
 
   return (
     <div className="min-h-screen bg-gray-50 pt-14">

@@ -234,3 +234,26 @@ export const aiAPI = {
     });
   },
 };
+
+export const usersAPI = {
+  getAll: async () => {
+    return await apiRequest<{ users: User[] }>('/users');
+  },
+  create: async (data: any) => {
+    return await apiRequest<{ user: User }>('/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  update: async (id: number, data: any) => {
+    return await apiRequest<{ user: User }>(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  remove: async (id: number) => {
+    return await apiRequest<{ message: string }>(`/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};

@@ -26,6 +26,7 @@ import meshRoutes from './routes/mesh.js';
 import messageRoutes from './routes/messages.js';
 import analyticsRoutes from './routes/analytics.js';
 import aiRoutes from './routes/ai.js';
+import userRoutes from './routes/users.js';
 
 // Initialize Express app
 const app = express();
@@ -85,6 +86,7 @@ app.use('/api/mesh', meshRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/users', userRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {

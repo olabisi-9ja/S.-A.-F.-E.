@@ -1,25 +1,9 @@
-import { useState } from 'react';
-import { Users, Shield, User, Hash, Mail, Search, UserPlus, X, ArrowLeft } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Users, Shield, User, Hash, Mail, Search, UserPlus, X, ArrowLeft, Edit2, Trash2 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
-import { MOCK_USERS } from '../../data/mockData';
+import { usersAPI } from '../../services/api';
 import type { User as UserType } from '../../types';
-
-const EXTRA_USERS: UserType[] = [
-  ...MOCK_USERS,
-  {
-    id: 4, full_name: 'Ibrahim Bello', institutional_email: 'ibrahim@kwasu.edu.ng',
-    role: 'standard_user', matric_or_staff_id: 'CSC/2020/088', created_at: '2024-09-01T08:00:00Z',
-  },
-  {
-    id: 5, full_name: 'Aisha Mohammed', institutional_email: 'aisha@kwasu.edu.ng',
-    role: 'standard_user', matric_or_staff_id: 'CSC/2023/012', created_at: '2024-09-01T08:00:00Z',
-  },
-  {
-    id: 6, full_name: 'Officer James Bello', institutional_email: 'james.bello@kwasu.edu.ng',
-    role: 'security_admin', matric_or_staff_id: 'SEC/008', created_at: '2024-01-15T08:00:00Z',
-  },
-];
 
 const roleVariant = (role: string): 'danger' | 'info' | 'default' => {
   if (role === 'super_admin') return 'danger';
@@ -36,23 +20,61 @@ const roleLabel = (role: string) => {
 export function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
-  const [usersList, setUsersList] = useState<UserType[]>(EXTRA_USERS);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newUserData, setNewUserData] = useState({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '' });
+  const [usersList, setUsersList] = useState<UserType[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUserData, setNewUserData] = useState({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '', password: '' });
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editUserData, setEditUserData] = useState<any>(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    const res = await usersAPI.getAll();
+    if (res.success && res.data?.users) {
+      setUsersList(res.data.users);
+    }
+    setLoading(false);
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newUser: UserType = {
-      id: Date.now(),
-      full_name: newUserData.full_name,
-      institutional_email: newUserData.institutional_email,
-      role: newUserData.role as any,
-      matric_or_staff_id: newUserData.matric_or_staff_id,
-      created_at: new Date().toISOString()
-    };
-    setUsersList([newUser, ...usersList]);
-    setShowAddModal(false);
-    setNewUserData({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '' });
+    const res = await usersAPI.create(newUserData);
+    if (res.success) {
+      fetchUsers();
+      setShowAddModal(false);
+      setNewUserData({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '', password: '' });
+    } else {
+      alert(res.error || 'Failed to create user');
+    }
+  };
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const res = await usersAPI.update(editUserData.id, editUserData);
+    if (res.success) {
+      fetchUsers();
+      setShowEditModal(false);
+      setEditUserData(null);
+    } else {
+      alert(res.error || 'Failed to update user');
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (confirm('Are you sure you want to delete this user?')) {
+      const res = await usersAPI.remove(id);
+      if (res.success) {
+        fetchUsers();
+      } else {
+        alert(res.error || 'Failed to delete user');
+      }
+    }
   };
 
   const filtered = usersList
@@ -174,14 +196,12 @@ export function AdminUsersPage() {
                   </div>
 
                   <div className="flex gap-2 shrink-0 sm:ml-auto">
-                    <button className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition w-full sm:w-auto">
-                      Edit
+                    <button onClick={() => { setEditUserData(user); setShowEditModal(true); }} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition w-full sm:w-auto">
+                      <Edit2 className="w-3 h-3" /> Edit
                     </button>
-                    {user.role === 'standard_user' && (
-                      <button className="text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition w-full sm:w-auto">
-                        Suspend
-                      </button>
-                    )}
+                    <button onClick={() => handleDeleteUser(user.id)} className="flex items-center gap-1 text-xs px-3 py-1.5 border border-red-200 rounded-lg text-red-600 hover:bg-red-50 transition w-full sm:w-auto">
+                      <Trash2 className="w-3 h-3" /> Remove
+                    </button>
                   </div>
                 </div>
               </CardContent>
@@ -220,9 +240,57 @@ export function AdminUsersPage() {
                   <option value="super_admin">Super Admin</option>
                 </select>
               </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input required type="password" value={newUserData.password} onChange={e => setNewUserData({...newUserData, password: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Minimum 6 characters" />
+              </div>
               <div className="pt-2">
                 <button type="submit" className="w-full bg-red-700 text-white font-medium py-2.5 rounded-lg text-sm hover:bg-red-800 transition">
                   Create User
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showEditModal && editUserData && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-md overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900">Edit User</h3>
+              <button onClick={() => { setShowEditModal(false); setEditUserData(null); }} className="text-gray-400 hover:text-gray-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditUser} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+                <input required type="text" value={editUserData.full_name} onChange={e => setEditUserData({...editUserData, full_name: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Institutional Email</label>
+                <input required type="email" value={editUserData.institutional_email} onChange={e => setEditUserData({...editUserData, institutional_email: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Matric or Staff ID</label>
+                <input required type="text" value={editUserData.matric_or_staff_id} onChange={e => setEditUserData({...editUserData, matric_or_staff_id: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                <select value={editUserData.role} onChange={e => setEditUserData({...editUserData, role: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 bg-white">
+                  <option value="standard_user">Student / Staff</option>
+                  <option value="security_admin">Security Admin</option>
+                  <option value="super_admin">Super Admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">New Password (Leave blank to keep current)</label>
+                <input type="password" value={editUserData.password || ''} onChange={e => setEditUserData({...editUserData, password: e.target.value})} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500" placeholder="Optional" />
+              </div>
+              <div className="pt-2">
+                <button type="submit" className="w-full bg-blue-600 text-white font-medium py-2.5 rounded-lg text-sm hover:bg-blue-700 transition">
+                  Save Changes
                 </button>
               </div>
             </form>
