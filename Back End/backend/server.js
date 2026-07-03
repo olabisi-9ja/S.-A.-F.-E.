@@ -9,6 +9,11 @@ import cron from 'node-cron';
 // Load environment variables
 dotenv.config();
 
+if (!process.env.JWT_SECRET) {
+  console.error('❌ FATAL: JWT_SECRET environment variable is missing.');
+  process.exit(1);
+}
+
 import { Op } from 'sequelize';
 import { createClient } from 'redis';
 import { createAdapter } from '@socket.io/redis-adapter';
@@ -36,7 +41,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     const allowedOrigins = process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000', 'https://safe-kwasu.vercel.app'];
-    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -88,9 +93,26 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/users', userRoutes);
 
+// Socket.io JWT Authentication Middleware
+import jwt from 'jsonwebtoken';
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (!token) {
+    return next(new Error('Authentication error: Token missing'));
+  }
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch (err) {
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  logger.info(` Client connected: ${socket.id}`);
+  logger.info(` Client connected: ${socket.id} (User ID: ${socket.user?.id})`);
 
   // Join incident room for real-time chat
   socket.on('join_incident', (incidentId) => {

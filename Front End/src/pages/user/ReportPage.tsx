@@ -40,14 +40,36 @@ export function ReportPage({ onNavigate }: ReportPageProps) {
     setLoading(true);
 
     try {
+      // Get real GPS location
+      let lat = 8.6762;
+      let lng = 4.1680;
+      
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          });
+        });
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+      } catch (err) {
+        console.warn('Could not get GPS location, using fallback.', err);
+      }
+
       const incident = await addIncident({
         reporter_id: user?.id ?? 99,
         reporter_name: user?.full_name ?? 'Unknown',
         category,
         description,
-        latitude: 8.6762 + (Math.random() - 0.5) * 0.005,
-        longitude: 4.1680 + (Math.random() - 0.5) * 0.005,
+        latitude: lat,
+        longitude: lng,
       });
+
+      if (!incident) {
+        throw new Error('Failed to create incident');
+      }
 
       setAiResult({
         category: incident.ai_category_suggestion,

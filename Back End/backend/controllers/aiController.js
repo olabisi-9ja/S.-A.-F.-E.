@@ -28,7 +28,7 @@ export const chatWithAI = async (req, res) => {
 
     // Fetch live data to provide context to the AI
     const activeIncidents = await Incident.findAll({
-      where: { status: ['pending', 'in_progress'] },
+      where: { status: ['received', 'in_progress'] },
       limit: 10,
       order: [['created_at', 'DESC']]
     });

@@ -34,26 +34,26 @@ export function HomePage({ onNavigate }: HomePageProps) {
     setSosState('sending');
 
     try {
-      // Get real GPS location
+      // Get real GPS location instantly
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 5000,
           maximumAge: 0
         });
       });
 
       const { latitude, longitude } = position.coords;
-      const mesh = !navigator.onLine || Math.random() < 0.1; // Mesh if offline or rare fallback
+      const mesh = !navigator.onLine; // Only use mesh if completely offline
       setUsedMesh(mesh);
-      triggerAlert(latitude, longitude, mesh ? 'mesh' : 'https');
+      await triggerAlert(latitude, longitude, mesh ? 'mesh' : 'https');
       setSosState('sent');
     } catch (error) {
-      // Fallback if location fails
+      // Fallback instantly if location fails
       console.warn('Geolocation failed, using fallback.', error);
       const mesh = !navigator.onLine;
       setUsedMesh(mesh);
-      triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https'); // Default KWASU coordinates
+      await triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https'); // Default KWASU coordinates
       setSosState('sent');
     }
 

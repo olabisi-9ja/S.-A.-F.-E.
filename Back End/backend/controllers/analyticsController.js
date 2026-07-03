@@ -211,17 +211,39 @@ export const getIncidentTrend = async (req, res) => {
     const { period = '7', groupBy = 'day' } = req.query;
     const daysAgo = new Date(Date.now() - parseInt(period) * 24 * 60 * 60 * 1000);
 
-    const trend = await Incident.findAll({
+    const incidentTrend = await Incident.findAll({
       where: { created_at: { [Op.gte]: daysAgo } },
       attributes: [
         [dateTrunc('created_at', groupBy), 'period'],
-        [fn('COUNT', col('id')), 'incidents'],
-        [fn('COUNT', col('id')), 'alerts'],
+        [fn('COUNT', col('id')), 'count'],
       ],
       group: [dateTrunc('created_at', groupBy)],
-      order: [[dateTrunc('created_at', groupBy), 'ASC']],
       raw: true,
     });
+
+    const alertTrend = await Alert.findAll({
+      where: { created_at: { [Op.gte]: daysAgo } },
+      attributes: [
+        [dateTrunc('created_at', groupBy), 'period'],
+        [fn('COUNT', col('id')), 'count'],
+      ],
+      group: [dateTrunc('created_at', groupBy)],
+      raw: true,
+    });
+
+    const trendMap = new Map();
+    incidentTrend.forEach(t => {
+      trendMap.set(t.period, { period: t.period, incidents: parseInt(t.count), alerts: 0 });
+    });
+    alertTrend.forEach(t => {
+      if (trendMap.has(t.period)) {
+        trendMap.get(t.period).alerts = parseInt(t.count);
+      } else {
+        trendMap.set(t.period, { period: t.period, incidents: 0, alerts: parseInt(t.count) });
+      }
+    });
+
+    const trend = Array.from(trendMap.values()).sort((a, b) => new Date(a.period) - new Date(b.period));
 
     res.json({
       success: true,

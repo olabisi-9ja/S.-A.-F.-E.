@@ -91,6 +91,10 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
+        <div className="mt-5">
+          <OAuthButtons onError={(err) => setError(err)} />
+        </div>
+
         <div className="mt-4 text-center">
           <button
             onClick={() => onNavigate('admin-login')}

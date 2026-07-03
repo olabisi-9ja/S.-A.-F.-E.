@@ -3,6 +3,8 @@ import { Alert, User, Notification, MeshPacket } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
 import logger from '../utils/logger.js';
 
+export const smsTimeouts = new Map();
+
 export const triggerAlert = async (req, res) => {
   try {
     const { latitude, longitude, transmission_mode = 'https' } = req.body;
@@ -78,7 +80,7 @@ export const triggerAlert = async (req, res) => {
     }, 15000);
 
     // Store timeout reference for cleanup if acknowledged manually
-    alert.smsTimeout = smsTimeout;
+    smsTimeouts.set(alert.id, smsTimeout);
 
     res.status(201).json({
       success: true,
@@ -121,8 +123,9 @@ export const acknowledgeAlert = async (req, res) => {
     }
 
     // Clear SMS timeout if exists
-    if (alert.smsTimeout) {
-      clearTimeout(alert.smsTimeout);
+    if (smsTimeouts.has(alert.id)) {
+      clearTimeout(smsTimeouts.get(alert.id));
+      smsTimeouts.delete(alert.id);
     }
 
     await alert.update({
@@ -147,7 +150,7 @@ export const acknowledgeAlert = async (req, res) => {
     // Emit socket event
     req.io?.emit('alert_acknowledged', {
       alertId: id,
-      acknowledged_by: req.user.full_name,
+      acknowledged_by: req.user?.full_name || 'Admin',
       timestamp: new Date(),
     });
 
@@ -177,8 +180,9 @@ export const resolveAlert = async (req, res) => {
     }
 
     // Clear SMS timeout if exists
-    if (alert.smsTimeout) {
-      clearTimeout(alert.smsTimeout);
+    if (smsTimeouts.has(alert.id)) {
+      clearTimeout(smsTimeouts.get(alert.id));
+      smsTimeouts.delete(alert.id);
     }
 
     await alert.update({
@@ -206,7 +210,7 @@ export const resolveAlert = async (req, res) => {
     // Emit socket event
     req.io?.emit('alert_resolved', {
       alertId: id,
-      resolved_by: req.user.full_name,
+      resolved_by: req.user?.full_name || 'Admin',
       timestamp: new Date(),
     });
 

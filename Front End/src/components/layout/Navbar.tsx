@@ -26,7 +26,7 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
   ];
 
   const adminLinks = [
-    { id: 'admin-dashboard', label: 'Dashboard' },
+    { id: 'admin', label: 'Dashboard' },
     { id: 'admin-incidents', label: 'Incidents' },
     { id: 'admin-map', label: 'Campus Map' },
     { id: 'admin-analytics', label: 'Analytics' },
@@ -40,7 +40,7 @@ export function Navbar({ currentPage, onNavigate }: NavbarProps) {
       {/* Logo */}
       <button
         onClick={() => onNavigate(isAdmin ? 'admin-dashboard' : 'home')}
-        className="absolute left-1/2 -translate-x-1/2 md:static md:translate-x-0 md:left-auto flex items-center gap-2 text-white font-extrabold tracking-widest text-sm hover:opacity-90 transition shrink-0"
+        className="absolute left-4 md:static md:translate-x-0 md:left-auto flex items-center gap-2 text-white font-extrabold tracking-widest text-sm hover:opacity-90 transition shrink-0"
       >
         <Shield className="w-5 h-5" />
         <span className="hidden sm:inline">S.A.F.E. KWASU</span>

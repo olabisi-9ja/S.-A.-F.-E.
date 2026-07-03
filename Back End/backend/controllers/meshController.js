@@ -2,13 +2,16 @@ import crypto from 'crypto';
 import { Alert, MeshPacket, User, Notification } from '../models/index.js';
 import { Op, Sequelize } from 'sequelize';
 import logger from '../utils/logger.js';
+import { smsTimeouts } from './alertController.js';
 
 const MESH_ENCRYPTION_KEY = process.env.MESH_ENCRYPTION_KEY || 'SAFE_MESH_KEY_32_CHARACTERS_LONG';
 
 // Decrypt mesh payload
 function decryptPayload(encryptedPayload) {
   try {
-    const decipher = crypto.createDecipher('aes-256-cbc', MESH_ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32));
+    const key = Buffer.from(MESH_ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32), 'utf8');
+    const iv = Buffer.alloc(16, 0);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encryptedPayload, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
@@ -130,7 +133,7 @@ export const syncMeshPacket = async (req, res) => {
       }
     }, 15000);
 
-    alert.smsTimeout = smsTimeout;
+    smsTimeouts.set(alert.id, smsTimeout);
 
     res.status(201).json({
       success: true,

@@ -15,7 +15,8 @@ const transporter = nodemailer.createTransport({
 });
 
 export const sendVerificationEmail = async (to, token) => {
-  const verificationUrl = `http://localhost:5173/auth/verify?token=${token}`;
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const verificationUrl = `${frontendUrl}/auth/verify?token=${token}`;
   
   // Mock if not configured for production
   if (!process.env.SMTP_USER || process.env.SMTP_USER === 'test' || process.env.SMTP_USER === 'placeholder') {

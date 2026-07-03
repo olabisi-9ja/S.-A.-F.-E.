@@ -4,6 +4,9 @@ import { Incident, User, Message, Notification } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
 import logger from '../utils/logger.js';
 import { generateUploadURL } from '../services/s3Service.js';
+import validator from 'validator';
+
+export const reportTimeouts = new Map();
 
 export const getUploadUrl = async (req, res) => {
   try {
@@ -83,11 +86,13 @@ export const createIncident = async (req, res) => {
     // AI Classification
     const aiResult = await classifyIncident(description);
 
+    const safeDescription = validator.escape(description);
+
     // Create incident
     const incident = await Incident.create({
       reporter_id: req.userId,
       category: aiResult.ai_category_suggestion || category,
-      description,
+      description: safeDescription,
       latitude,
       longitude,
       media_url: media_url || null,
@@ -127,6 +132,26 @@ export const createIncident = async (req, res) => {
       timestamp: incident.created_at,
       is_suspicious: incident.ai_is_suspicious,
     });
+
+    // Schedule SMS fallback for 15 minutes if not acknowledged
+    const fallbackTimeout = setTimeout(async () => {
+      try {
+        const freshIncident = await Incident.findByPk(incident.id);
+        if (freshIncident && freshIncident.status === 'received') {
+          const securityPhone = process.env.SECURITY_PHONE;
+          if (securityPhone) {
+            await sendSMS(
+              securityPhone,
+              `🚨 SAFE REPORT: Unacknowledged ${incident.category} report from ${reporter.full_name}. Action required.`
+            );
+          }
+        }
+      } catch (err) {
+        logger.error('Report SMS fallback failed:', err.message);
+      }
+    }, 15 * 60 * 1000);
+    
+    reportTimeouts.set(incident.id, fallbackTimeout);
 
     res.status(201).json({
       success: true,
@@ -264,8 +289,20 @@ export const updateIncident = async (req, res) => {
       if (status === 'resolved') {
         incident.resolved_at = new Date();
       }
+      // If status is changed from received, clear timeout
+      if (status !== 'received' && reportTimeouts.has(incident.id)) {
+        clearTimeout(reportTimeouts.get(incident.id));
+        reportTimeouts.delete(incident.id);
+      }
     }
-    if (assigned_officer_id) incident.assigned_officer_id = assigned_officer_id;
+    if (assigned_officer_id) {
+      incident.assigned_officer_id = assigned_officer_id;
+      // Also clear timeout if assigned
+      if (reportTimeouts.has(incident.id)) {
+        clearTimeout(reportTimeouts.get(incident.id));
+        reportTimeouts.delete(incident.id);
+      }
+    }
     if (assigned_officer_name) incident.assigned_officer_name = assigned_officer_name;
     if (resolution_notes) incident.resolution_notes = resolution_notes;
 

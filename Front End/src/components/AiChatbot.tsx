@@ -17,10 +17,50 @@ export function AiChatbot() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const initialPosition = useRef({ x: 0, y: 0 });
+  const hasDragged = useRef(false);
+
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    setIsDragging(true);
+    hasDragged.current = false;
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    initialPosition.current = { ...position };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      hasDragged.current = true;
+    }
+    setPosition({
+      x: initialPosition.current.x + dx,
+      y: initialPosition.current.y + dy,
+    });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  const handleButtonClick = () => {
+    if (hasDragged.current) {
+      hasDragged.current = false;
+      return;
+    }
+    setIsOpen(true);
+  };
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
@@ -81,8 +121,13 @@ export function AiChatbot() {
       {/* Floating Action Button */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 p-4 bg-red-700 text-white rounded-full shadow-lg hover:bg-red-800 hover:scale-105 transition-all z-50 flex items-center justify-center group"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          onClick={handleButtonClick}
+          style={{ transform: `translate(${position.x}px, ${position.y}px)`, touchAction: 'none' }}
+          className="fixed bottom-6 right-6 p-4 bg-red-700 text-white rounded-full shadow-lg hover:bg-red-800 transition-colors z-50 flex items-center justify-center group cursor-grab active:cursor-grabbing"
           aria-label="Open AI Assistant"
         >
           <Bot className="w-6 h-6" />

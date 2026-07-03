@@ -175,6 +175,15 @@ export function RegisterPage({ onNavigate }: RegisterPageProps) {
           </Button>
         </form>
 
+        <div className="mt-5">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
+          </div>
+          <OAuthButtons onError={(err) => setError(err)} />
+        </div>
+
         <p className="mt-6 text-center text-sm text-gray-500">
           Already have an account?{' '}
           <button onClick={() => onNavigate('login')} className="text-red-700 font-semibold hover:underline">

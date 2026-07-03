@@ -78,6 +78,10 @@ export const authAPI = {
       body: JSON.stringify(data),
     });
   },
+
+  logout: async () => {
+    return await apiRequest('/auth/logout', { method: 'POST' });
+  },
 };
 
 export const incidentsAPI = {

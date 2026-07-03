@@ -89,8 +89,8 @@ export function AdminUsersPage() {
     <div className="min-h-screen bg-gray-50 pt-14">
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
         <div>
-          <button onClick={() => window.location.href = '/admin-dashboard'} className="inline-flex items-center gap-1 text-sm text-red-700 hover:bg-red-50 px-2 py-1 -ml-2 rounded-lg transition font-medium mb-3">
-            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+          <button onClick={() => window.history.back()} className="inline-flex items-center gap-1 text-sm text-red-700 hover:bg-red-50 px-2 py-1 -ml-2 rounded-lg transition font-medium mb-3">
+            <ArrowLeft className="w-4 h-4" /> Back
           </button>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

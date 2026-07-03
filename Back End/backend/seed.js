@@ -32,6 +32,7 @@ async function seed() {
       role: 'super_admin',
       phone: '+2348000000001',
       matric_or_staff_id: 'SEC/001',
+      email_verified: true,
     });
 
     const securityAdmin = await User.create({
@@ -41,6 +42,7 @@ async function seed() {
       role: 'security_admin',
       phone: '+2348098765432',
       matric_or_staff_id: 'SEC/005',
+      email_verified: true,
     });
 
     const officer = await User.create({
@@ -50,6 +52,7 @@ async function seed() {
       role: 'security_admin',
       phone: '+2348012345678',
       matric_or_staff_id: 'SEC/008',
+      email_verified: true,
     });
 
     const student1 = await User.create({
@@ -59,6 +62,7 @@ async function seed() {
       role: 'standard_user',
       phone: '+2348012345678',
       matric_or_staff_id: 'CSC/2021/001',
+      email_verified: true,
     });
 
     const student2 = await User.create({
