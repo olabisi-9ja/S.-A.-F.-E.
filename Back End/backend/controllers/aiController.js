@@ -75,6 +75,15 @@ Use this data to answer the user's question accurately. If they ask about incide
 
   } catch (error) {
     logger.error('AI Chatbot error:', error);
+    
+    // Handle invalid API key error gracefully instead of a generic 500
+    if (error.status === 400 || (error.message && error.message.includes('API key not valid'))) {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'AI Chatbot is currently unavailable (Invalid GEMINI_API_KEY provided).' 
+      });
+    }
+
     res.status(500).json({ success: false, error: 'Failed to process AI chat request.' });
   }
 };
