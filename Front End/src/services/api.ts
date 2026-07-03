@@ -218,3 +218,12 @@ export const healthCheck = async () => {
     return null;
   }
 };
+
+export const aiAPI = {
+  chat: async (message: string) => {
+    return await apiRequest<{ reply: string }>('/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  },
+};

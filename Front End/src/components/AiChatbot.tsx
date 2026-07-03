@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Sparkles } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { aiAPI } from '../services/api';
 
 interface ChatMessage {
   id: string;
@@ -36,19 +37,9 @@ export function AiChatbot() {
     setIsTyping(true);
 
     try {
-      const token = localStorage.getItem('safe_token');
-      const response = await fetch('http://localhost:5000/api/ai/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ message: userMsg.content }),
-      });
+      const result = await aiAPI.chat(userMsg.content);
 
-      const result = await response.json();
-
-      if (result.success) {
+      if (result.success && result.data) {
         const botMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
