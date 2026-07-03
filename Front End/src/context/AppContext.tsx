@@ -21,9 +21,9 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS);
-  const [alerts, setAlerts] = useState<Alert[]>(MOCK_ALERTS);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [useMock, setUseMock] = useState(true);
 
@@ -48,8 +48,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUseMock(false);
       }
     } catch (error) {
-      console.warn('API fetch failed, using mock data:', error);
-      setUseMock(true);
+      console.error('API fetch failed. Ensure VITE_API_URL is set in production:', error);
+      // We no longer fall back to dummy data in production
+      setUseMock(false);
     } finally {
       setIsLoading(false);
     }
