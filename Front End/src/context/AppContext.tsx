@@ -2,6 +2,22 @@ import React, { createContext, useContext, useState, useCallback, useEffect } fr
 import type { Incident, Alert, Message, IncidentStatus } from '../types';
 import { incidentsAPI, alertsAPI, messagesAPI } from '../services/api';
 import { MOCK_INCIDENTS, MOCK_ALERTS, MOCK_MESSAGES } from '../data/mockData';
+import { io, Socket } from 'socket.io-client';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// Fix base url for socket by stripping /api if it exists
+const SOCKET_URL = API_BASE_URL.replace(/\/api$/, '');
+
+let socketInstance: Socket | null = null;
+const getSocket = () => {
+  if (!socketInstance) {
+    socketInstance = io(SOCKET_URL, {
+      transports: ['websocket', 'polling'],
+      autoConnect: true,
+    });
+  }
+  return socketInstance;
+};
 
 interface AppContextType {
   incidents: Incident[];
@@ -16,6 +32,9 @@ interface AppContextType {
   resolveAlert: (id: number) => Promise<boolean>;
   sendMessage: (incident_id: number, sender_id: number, sender_name: string, sender_role: string, content: string) => Promise<Message | null>;
   getIncidentMessages: (incident_id: number) => Message[];
+  fetchIncidentMessages: (incident_id: number) => Promise<void>;
+  joinIncidentChat: (incident_id: number) => void;
+  leaveIncidentChat: (incident_id: number) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -29,6 +48,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     refreshData();
+    
+    const socket = getSocket();
+    
+    // Listen for new messages globally
+    socket.on('new_message', (msg: Message) => {
+      setMessages(prev => {
+        // Prevent duplicates
+        if (prev.some(m => m.id === msg.id)) return prev;
+        return [...prev, msg];
+      });
+    });
+
+    return () => {
+      socket.off('new_message');
+    };
   }, []);
 
   const refreshData = useCallback(async () => {
@@ -188,6 +222,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return messages.filter(m => m.incident_id === incident_id);
   }, [messages]);
 
+  const fetchIncidentMessages = useCallback(async (incident_id: number) => {
+    if (useMock) return;
+    const result = await messagesAPI.getByIncident(incident_id);
+    if (result.success && result.data) {
+      setMessages(prev => {
+        // Merge without duplicates
+        const existingIds = new Set(prev.map(m => m.id));
+        const newMsgs = result.data!.messages.filter(m => !existingIds.has(m.id));
+        return [...prev, ...newMsgs];
+      });
+    }
+  }, [useMock]);
+
+  const joinIncidentChat = useCallback((incident_id: number) => {
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('join_incident', incident_id);
+    }
+  }, []);
+
+  const leaveIncidentChat = useCallback((incident_id: number) => {
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit('leave_incident', incident_id);
+    }
+  }, []);
+
   return (
     <AppContext.Provider value={{
       incidents, alerts, messages,
@@ -195,7 +256,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshData,
       addIncident, updateIncidentStatus,
       triggerAlert, acknowledgeAlert, resolveAlert,
-      sendMessage, getIncidentMessages,
+      sendMessage, getIncidentMessages, fetchIncidentMessages,
+      joinIncidentChat, leaveIncidentChat,
     }}>
       {children}
     </AppContext.Provider>

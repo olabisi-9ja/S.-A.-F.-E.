@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { X, Send, MessageSquare } from 'lucide-react';
 import type { Message, Incident } from '../types';
 import { cn } from '../utils/cn';
+import { useApp } from '../context/AppContext';
 
 interface ChatModalProps {
   incident: Incident;
@@ -18,6 +19,16 @@ function timeStr(dateStr: string) {
 export function ChatModal({ incident, messages, onClose, onSend, currentUserId }: ChatModalProps) {
   const [text, setText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const { fetchIncidentMessages, joinIncidentChat, leaveIncidentChat } = useApp();
+
+  useEffect(() => {
+    fetchIncidentMessages(incident.id);
+    joinIncidentChat(incident.id);
+    
+    return () => {
+      leaveIncidentChat(incident.id);
+    };
+  }, [incident.id, fetchIncidentMessages, joinIncidentChat, leaveIncidentChat]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
