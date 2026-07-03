@@ -117,7 +117,7 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       {!alert.acknowledged && <Badge variant="danger">New</Badge>}
                     </div>
                     <p className="text-xs text-gray-500">
-                      {alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)} · {timeAgo(alert.created_at)}
+                      {Number(alert.latitude).toFixed(4)}, {Number(alert.longitude).toFixed(4)} · {timeAgo(alert.created_at)}
                     </p>
                     <div className="flex gap-2">
                       {!alert.acknowledged && (

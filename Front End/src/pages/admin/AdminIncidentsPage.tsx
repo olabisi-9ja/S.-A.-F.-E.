@@ -122,7 +122,7 @@ export function AdminIncidentsPage({ onNavigate: _onNavigate }: AdminIncidentsPa
                     {/* Meta */}
                     <div className="flex flex-wrap gap-3 text-xs text-gray-400">
                       <span>Reporter: <span className="text-gray-700 font-medium">{inc.reporter_name}</span></span>
-                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{inc.latitude.toFixed(4)}, {inc.longitude.toFixed(4)}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{Number(inc.latitude).toFixed(4)}, {Number(inc.longitude).toFixed(4)}</span>
                       <span>{timeAgo(inc.created_at)}</span>
                     </div>
 

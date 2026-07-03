@@ -55,7 +55,7 @@ export function AlertsPage() {
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Location: {a.latitude.toFixed(6)}, {a.longitude.toFixed(6)}
+                Location: {Number(a.latitude).toFixed(6)}, {Number(a.longitude).toFixed(6)}
               </p>
             </div>
           ))}

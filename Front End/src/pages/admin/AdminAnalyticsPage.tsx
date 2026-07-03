@@ -154,7 +154,7 @@ export function AdminAnalyticsPage() {
                     <p className="text-sm font-medium text-gray-700">
                       {spot.label}
                     </p>
-                    <p className="text-xs text-gray-400">{spot.latitude.toFixed(4)}, {spot.longitude.toFixed(4)}</p>
+                    <p className="text-xs text-gray-400">{Number(spot.latitude).toFixed(4)}, {Number(spot.longitude).toFixed(4)}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-gray-900">{spot.count}</p>

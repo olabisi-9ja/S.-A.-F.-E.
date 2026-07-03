@@ -169,7 +169,7 @@ export function AdminMapPage() {
                   <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900">{alert.user_name}</p>
-                    <p className="text-xs text-gray-400">{alert.latitude.toFixed(4)}, {alert.longitude.toFixed(4)}</p>
+                    <p className="text-xs text-gray-400">{Number(alert.latitude).toFixed(4)}, {Number(alert.longitude).toFixed(4)}</p>
                   </div>
                   {alert.transmission_mode === 'mesh' && (
                     <Badge variant="mesh"><Radio className="w-3 h-3" />Mesh</Badge>

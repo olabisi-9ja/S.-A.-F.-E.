@@ -14,8 +14,8 @@ export function getRealHotspots(incidents: Incident[]): Hotspot[] {
     if (!inc.latitude || !inc.longitude) return;
     
     // Round to 3 decimal places (approx ~110 meters at the equator)
-    const lat = parseFloat(inc.latitude.toFixed(3));
-    const lng = parseFloat(inc.longitude.toFixed(3));
+    const lat = parseFloat(Number(inc.latitude).toFixed(3));
+    const lng = parseFloat(Number(inc.longitude).toFixed(3));
     const key = `${lat},${lng}`;
 
     if (!grid.has(key)) {
