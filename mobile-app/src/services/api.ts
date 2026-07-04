@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://172.31.26.202:5000'; // Local backend URL for physical device testing
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.31.26.202:5000';
 
 const getToken = async () => {
   try {

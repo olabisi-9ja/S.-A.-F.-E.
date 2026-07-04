@@ -1,8 +1,19 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../services/api';
+
+interface User {
+  id: number;
+  full_name: string;
+  institutional_email: string;
+  role: string;
+  phone?: string;
+  matric_or_staff_id?: string;
+}
 
 interface AuthContextType {
   token: string | null;
+  user: User | null;
   isLoading: boolean;
   login: (token: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -12,6 +23,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,9 +33,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedToken = await AsyncStorage.getItem('safe_token');
         if (storedToken) {
           setToken(storedToken);
+          // Try to fetch profile if we have token
+          const result = await api.get('/api/auth/profile');
+          if (result && result.success && result.data && result.data.user) {
+            setUser(result.data.user);
+          } else {
+             // Invalid token fallback
+             await AsyncStorage.removeItem('safe_token');
+             setToken(null);
+          }
         }
       } catch (e) {
-        console.error('Failed to load token', e);
+        console.error('Failed to load token or profile', e);
       } finally {
         setIsLoading(false);
       }
@@ -35,8 +56,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await AsyncStorage.setItem('safe_token', newToken);
       setToken(newToken);
+      const result = await api.get('/api/auth/profile');
+      if (result && result.success && result.data && result.data.user) {
+        setUser(result.data.user);
+      }
     } catch (e) {
-      console.error('Failed to save token', e);
+      console.error('Failed to save token or fetch profile', e);
     }
   };
 
@@ -44,13 +69,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await AsyncStorage.removeItem('safe_token');
       setToken(null);
+      setUser(null);
     } catch (e) {
       console.error('Failed to remove token', e);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ token, user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

@@ -6,18 +6,25 @@ import { useAuth } from '@/context/AuthContext';
 const PORTFOLIO_URL = 'https://olabisiadigun.xyz';
 
 export default function ProfileScreen() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
+  
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>AA</Text>
+          <Text style={styles.avatarText}>{getInitials(user?.full_name || '')}</Text>
         </View>
-        <Text style={styles.name}>Abel Adigun</Text>
-        <Text style={styles.email}>abel.adigun@kwasu.edu.ng</Text>
+        <Text style={styles.name}>{user?.full_name || 'Student Name'}</Text>
+        <Text style={styles.email}>{user?.institutional_email || 'student@kwasu.edu.ng'}</Text>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>Verified Student</Text>
+          <Text style={styles.badgeText}>
+            {user?.role === 'security_admin' || user?.role === 'super_admin' ? 'Security Personnel' : 'Verified Student'}
+          </Text>
         </View>
       </View>
 

@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, Linking } fr
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { api } from '@/services/api';
+import { useAuth } from '@/context/AuthContext';
 
 const PORTFOLIO_URL = 'https://olabisiadigun.xyz';
 
 export default function HomeScreen() {
+  const { user } = useAuth();
   const [isPressing, setIsPressing] = useState(false);
-  const scaleAnim = new Animated.Value(1);
+  const scaleAnim = new Animated.Value(1); // TODO: move to useRef if fixing animated value bug
 
   const handleSOSPressIn = () => {
     setIsPressing(true);
@@ -85,7 +87,7 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.greeting}>Stay Safe, Abel</Text>
+        <Text style={styles.greeting}>Stay Safe, {user?.full_name?.split(' ')[0] || 'Student'}</Text>
         <Text style={styles.subtitle}>Emergency Response is active.</Text>
       </View>
 

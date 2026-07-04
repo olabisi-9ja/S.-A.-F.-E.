@@ -73,7 +73,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isAuthenticated) {
       refreshData();
-      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'default') {
+      if ((user?.role === 'security_admin' || user?.role === 'super_admin') && 'Notification' in window && Notification.permission === 'default') {
         Notification.requestPermission();
       }
     }
@@ -81,8 +81,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Initial setup for sockets and offline sync
   useEffect(() => {
-    refreshData();
-    
     const socket = getSocket();
     
     // Listen for new messages globally
@@ -95,7 +93,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     socket.on('new_incident', (inc: Incident) => {
       setIncidents(prev => [inc, ...prev.filter(i => i.id !== inc.id)]);
-      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'granted') {
+      if ((user?.role === 'security_admin' || user?.role === 'super_admin') && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('New S.A.F.E. Incident', {
           body: `${inc.category} reported. AI Severity: ${inc.ai_severity_score}`
         });
@@ -104,7 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     socket.on('new_alert', (alert: Alert) => {
       setAlerts(prev => [alert, ...prev.filter(a => a.id !== alert.id)]);
-      if (user?.role === 'admin' && 'Notification' in window && Notification.permission === 'granted') {
+      if ((user?.role === 'security_admin' || user?.role === 'super_admin') && 'Notification' in window && Notification.permission === 'granted') {
         new Notification('🚨 S.A.F.E. SOS ALERT!', {
           body: `Emergency triggered by ${alert.user_name}`
         });

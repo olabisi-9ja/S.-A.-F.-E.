@@ -9,11 +9,12 @@ export default function RegisterScreen() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [matricOrStaffId, setMatricOrStaffId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!fullName || !email || !phone || !password) {
+    if (!fullName || !email || !phone || !password || !matricOrStaffId) {
       Alert.alert('Error', 'Please fill out all fields.');
       return;
     }
@@ -23,6 +24,7 @@ export default function RegisterScreen() {
         full_name: fullName, 
         institutional_email: email, 
         phone, 
+        matric_or_staff_id: matricOrStaffId,
         password 
       });
       
@@ -67,6 +69,22 @@ export default function RegisterScreen() {
             autoCapitalize="none"
             value={email}
             onChangeText={setEmail}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Phone Number"
+            placeholderTextColor="#9ca3af"
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={setPhone}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Matric / Staff ID"
+            placeholderTextColor="#9ca3af"
+            autoCapitalize="characters"
+            value={matricOrStaffId}
+            onChangeText={setMatricOrStaffId}
           />
           <TextInput
             style={styles.input}

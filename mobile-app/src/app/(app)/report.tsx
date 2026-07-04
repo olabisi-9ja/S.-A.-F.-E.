@@ -2,14 +2,28 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/services/api';
 
 export default function ReportScreen() {
   const [description, setDescription] = useState('');
   const [incidentType, setIncidentType] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mediaUri, setMediaUri] = useState<string | null>(null);
 
   const types = ['Theft', 'Harassment', 'Fire', 'Medical', 'Other'];
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images', 'videos'],
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setMediaUri(result.assets[0].uri);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!incidentType || !description) {
@@ -42,6 +56,7 @@ export default function ReportScreen() {
             { text: 'OK', onPress: () => {
               setDescription('');
               setIncidentType('');
+              setMediaUri(null);
             }}
           ]
         );
@@ -93,13 +108,23 @@ export default function ReportScreen() {
         onChangeText={setDescription}
       />
 
-      <TouchableOpacity style={styles.cameraButton}>
+      <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
         <Ionicons name="camera" size={24} color="#4b5563" />
-        <Text style={styles.cameraText}>Attach Photo / Video</Text>
+        <Text style={styles.cameraText}>
+          {mediaUri ? 'Media Attached (Tap to change)' : 'Attach Photo / Video'}
+        </Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Submit Report</Text>
+      <TouchableOpacity 
+        style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
+        onPress={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.submitButtonText}>Submit Report</Text>
+        )}
       </TouchableOpacity>
       <View style={{ height: 40 }} />
     </ScrollView>
@@ -207,6 +232,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#9ca3af',
   },
   submitButtonText: {
     color: 'white',
