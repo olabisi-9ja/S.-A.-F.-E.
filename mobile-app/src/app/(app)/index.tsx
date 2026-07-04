@@ -36,7 +36,7 @@ export default function HomeScreen() {
       
       const loc = await Location.getCurrentPositionAsync({});
       
-      const result = await api.post('/api/alerts/trigger', {
+      const result = await api.post('/api/alerts', {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
         transmission_mode: 'https'
