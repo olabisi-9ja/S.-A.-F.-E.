@@ -14,8 +14,24 @@ export default function MapScreen() {
         setErrorMsg('Permission to access location was denied');
         return;
       }
-      let loc = await Location.getCurrentPositionAsync({});
-      setLocation(loc);
+      
+      try {
+        // Try getting last known position first (fastest)
+        let loc = await Location.getLastKnownPositionAsync({});
+        if (loc) {
+          setLocation(loc);
+        }
+        
+        // Then try current position but with lower accuracy to prevent hanging
+        let currentLoc = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        setLocation(currentLoc);
+      } catch (err) {
+        if (!location) {
+          setErrorMsg('Failed to fetch location');
+        }
+      }
     })();
   }, []);
 

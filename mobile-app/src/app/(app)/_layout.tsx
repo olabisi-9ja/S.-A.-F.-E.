@@ -3,8 +3,11 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import { FloatingChatbot } from '../../components/FloatingChatbot';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function AppLayout() {
+  const insets = useSafeAreaInsets();
+  
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -17,8 +20,8 @@ export default function AppLayout() {
           tabBarActiveTintColor: '#b91c1c',
           tabBarInactiveTintColor: '#9ca3af',
           tabBarStyle: {
-            height: Platform.OS === 'ios' ? 85 : 65,
-            paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+            height: Platform.OS === 'ios' ? 85 : 65 + insets.bottom,
+            paddingBottom: Platform.OS === 'ios' ? 25 : Math.max(15, insets.bottom),
             paddingTop: 10,
             backgroundColor: '#fff',
             borderTopWidth: 1,
