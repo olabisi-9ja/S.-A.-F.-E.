@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { api } from '@/services/api';
+
+const PORTFOLIO_URL = 'https://olabisiadigun.xyz';
 
 export default function HomeScreen() {
   const [isPressing, setIsPressing] = useState(false);
@@ -70,7 +72,14 @@ export default function HomeScreen() {
   };
 
   const triggerDemo = (type: string) => {
-    Alert.alert(`${type} Emergency`, `This is a demo button for ${type} emergency action. In a real scenario, this would notify the specific unit.`);
+    Alert.alert(
+      `${type} Alert`,
+      `This feature is coming soon. Visit the project portfolio to learn more about S.A.F.E.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'View Project', onPress: () => Linking.openURL(PORTFOLIO_URL) },
+      ]
+    );
   };
 
   return (

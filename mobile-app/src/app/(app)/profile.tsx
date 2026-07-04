@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+
+const PORTFOLIO_URL = 'https://olabisiadigun.xyz';
 
 export default function ProfileScreen() {
   const { logout } = useAuth();
@@ -50,7 +52,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Support</Text>
         
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL(PORTFOLIO_URL)}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="help-circle-outline" size={24} color="#4b5563" />
             <Text style={styles.menuItemText}>Help Center</Text>
@@ -58,7 +60,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => Linking.openURL(PORTFOLIO_URL)}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="shield-checkmark-outline" size={24} color="#4b5563" />
             <Text style={styles.menuItemText}>Privacy Policy</Text>
@@ -72,6 +74,16 @@ export default function ProfileScreen() {
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
       
+      {/* Creator Credit */}
+      <TouchableOpacity style={styles.creditBlock} onPress={() => Linking.openURL(PORTFOLIO_URL)} activeOpacity={0.7}>
+        <Ionicons name="code-slash-outline" size={14} color="#9ca3af" />
+        <Text style={styles.creditText}>
+          Designed & built by{' '}
+          <Text style={styles.creditName}>Olabisi Adigun</Text>
+        </Text>
+        <Ionicons name="open-outline" size={12} color="#b91c1c" />
+      </TouchableOpacity>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -177,5 +189,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ef4444',
-  }
+  },
+  creditBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 28,
+    marginHorizontal: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  creditText: {
+    fontSize: 13,
+    color: '#9ca3af',
+    fontWeight: '400',
+  },
+  creditName: {
+    color: '#b91c1c',
+    fontWeight: '700',
+  },
 });
