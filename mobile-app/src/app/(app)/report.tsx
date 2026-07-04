@@ -1,29 +1,58 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { api } from '@/services/api';
 
 export default function ReportScreen() {
   const [description, setDescription] = useState('');
   const [incidentType, setIncidentType] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const types = ['Theft', 'Harassment', 'Fire', 'Medical', 'Other'];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!incidentType || !description) {
       Alert.alert('Missing Info', 'Please select an incident type and provide a description.');
       return;
     }
     
-    Alert.alert(
-      'Report Submitted', 
-      'Your report has been sent to campus security successfully.',
-      [
-        { text: 'OK', onPress: () => {
-          setDescription('');
-          setIncidentType('');
-        }}
-      ]
-    );
+    setLoading(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to submit a report.');
+        return;
+      }
+      
+      const loc = await Location.getCurrentPositionAsync({});
+      
+      const result = await api.post('/api/incidents', {
+        category: incidentType,
+        description,
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude
+      });
+
+      if (result.success) {
+        Alert.alert(
+          'Report Submitted', 
+          'Your report has been sent to campus security successfully. AI Classification: ' + result.data.ai_classification.ai_severity_score + '% severity.',
+          [
+            { text: 'OK', onPress: () => {
+              setDescription('');
+              setIncidentType('');
+            }}
+          ]
+        );
+      } else {
+        Alert.alert('Report Failed', result.error || 'Could not submit report.');
+      }
+    } catch (err: any) {
+      Alert.alert('Network Error', err.message || 'Check your connection.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

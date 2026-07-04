@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { api } from '@/services/api';
 
 export default function HomeScreen() {
   const [isPressing, setIsPressing] = useState(false);
@@ -24,12 +26,34 @@ export default function HomeScreen() {
     }).start();
   };
 
-  const triggerSOS = () => {
-    Alert.alert(
-      "SOS Triggered!",
-      "Campus security has been notified of your location.",
-      [{ text: "OK" }]
-    );
+  const triggerSOS = async () => {
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required for SOS.');
+        return;
+      }
+      
+      const loc = await Location.getCurrentPositionAsync({});
+      
+      const result = await api.post('/api/alerts/trigger', {
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+        transmission_mode: 'https'
+      });
+
+      if (result.success) {
+        Alert.alert(
+          "SOS Triggered!",
+          "Campus security has been notified of your location. A SMS fallback is armed.",
+          [{ text: "OK" }]
+        );
+      } else {
+        Alert.alert("SOS Failed", result.error || 'Could not reach server.');
+      }
+    } catch (err: any) {
+      Alert.alert("Network Error", err.message || 'Check your connection.');
+    }
   };
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
 
@@ -17,19 +18,20 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      // Temporarily mock login for UI testing, later connect to api
-      // const result = await api.post('/api/auth/login', { email, password });
-      // if (result.success) await login(result.token);
+      const result = await api.post('/api/auth/login', { 
+        institutional_email: email, 
+        password 
+      });
       
-      // MOCK:
-      setTimeout(async () => {
-        await login('mock_token_123');
-      }, 1000);
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Login Failed', 'Please check your credentials and try again.');
+      if (result.success && result.data.token) {
+        await login(result.data.token);
+      } else {
+        Alert.alert('Login Failed', result.error || 'Please check your credentials and try again.');
+      }
+    } catch (err: any) {
+      Alert.alert('Network Error', err.message || 'Could not connect to server.');
     } finally {
-      // setLoading(false) happens after unmount or timeout
+      setLoading(false);
     }
   };
 

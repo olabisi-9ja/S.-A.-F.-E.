@@ -1,34 +1,43 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { Link, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/services/api';
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!name || !email || !password) {
+    if (!fullName || !email || !phone || !password) {
       Alert.alert('Error', 'Please fill out all fields.');
       return;
     }
     setLoading(true);
     try {
-      // Mock registration logic
-      setTimeout(() => {
-        setLoading(false);
+      const result = await api.post('/api/auth/register', { 
+        full_name: fullName, 
+        institutional_email: email, 
+        phone, 
+        password 
+      });
+      
+      if (result.success) {
         Alert.alert(
-          'Registration Successful', 
-          'Please check your email to verify your account before logging in.',
+          'Registration Successful',
+          'Please check your email for the verification link.',
           [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
         );
-      }, 1500);
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Registration Failed', 'Something went wrong.');
+      } else {
+        Alert.alert('Registration Failed', result.error || 'Something went wrong.');
+      }
+    } catch (err: any) {
+      Alert.alert('Network Error', err.message || 'Could not connect to server.');
+    } finally {
       setLoading(false);
     }
   };
