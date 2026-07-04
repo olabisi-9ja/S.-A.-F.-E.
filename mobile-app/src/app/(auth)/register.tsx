@@ -56,8 +56,8 @@ export default function RegisterScreen() {
             style={styles.input}
             placeholder="Full Name"
             placeholderTextColor="#9ca3af"
-            value={name}
-            onChangeText={setName}
+            value={fullName}
+            onChangeText={setFullName}
           />
           <TextInput
             style={styles.input}
