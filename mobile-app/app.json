@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "S.A.F.E.",
-    "slug": "mobile-app",
+    "name": "SAFE",
+    "slug": "safe-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
