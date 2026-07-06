@@ -129,7 +129,7 @@ export function LiveTrackerPage() {
     </div>
   );
 
-  const center: [number, number] = [alertData.latitude, alertData.longitude];
+  const center: [number, number] = [Number(alertData.latitude), Number(alertData.longitude)];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
