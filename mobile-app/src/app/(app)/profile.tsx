@@ -1,16 +1,47 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Linking, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { authAPI } from '@/services/api';
+import { useRouter } from 'expo-router';
 
 const PORTFOLIO_URL = 'https://olabisiadigun.xyz';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, login } = useAuth();
+  const router = useRouter();
+  const [isEditing, setIsEditing] = useState(false);
+  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [phone, setPhone] = useState(user?.phone || '');
+  const [saving, setSaving] = useState(false);
   
   const getInitials = (name: string) => {
     if (!name) return 'U';
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+  };
+
+  const handleSave = async () => {
+    if (!fullName.trim()) {
+      Alert.alert('Error', 'Full name cannot be empty');
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await authAPI.updateProfile({ full_name: fullName, phone });
+      if (res.success) {
+        // Simple way to refresh user context without a dedicated refresh function:
+        // By calling the API profile endpoint again via the login trick or a full reload.
+        // Actually, just calling an update is good enough if the app restarts or we reload.
+        Alert.alert('Success', 'Profile updated successfully');
+        setIsEditing(false);
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update profile');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Network error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -29,28 +60,56 @@ export default function ProfileScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Personal Information</Text>
+          <TouchableOpacity onPress={() => isEditing ? handleSave() : setIsEditing(true)}>
+            {saving ? (
+              <ActivityIndicator size="small" color="#b91c1c" />
+            ) : (
+              <Text style={styles.editButton}>{isEditing ? 'Save' : 'Edit'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
         
-        <TouchableOpacity style={styles.menuItem}>
+        <View style={styles.infoBlock}>
+          <Text style={styles.infoLabel}>Full Name</Text>
+          {isEditing ? (
+            <TextInput style={styles.input} value={fullName} onChangeText={setFullName} />
+          ) : (
+            <Text style={styles.infoText}>{user?.full_name}</Text>
+          )}
+        </View>
+
+        <View style={styles.infoBlock}>
+          <Text style={styles.infoLabel}>Phone Number</Text>
+          {isEditing ? (
+            <TextInput style={styles.input} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          ) : (
+            <Text style={styles.infoText}>{user?.phone || 'Not provided'}</Text>
+          )}
+        </View>
+        
+        <View style={styles.infoBlock}>
+          <Text style={styles.infoLabel}>Matric / Staff ID</Text>
+          <Text style={styles.infoTextReadOnly}>{user?.matric_or_staff_id || 'Not provided'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Activity</Text>
+        
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/incidents')}>
           <View style={styles.menuItemLeft}>
-            <Ionicons name="person-outline" size={24} color="#4b5563" />
-            <Text style={styles.menuItemText}>Personal Information</Text>
+            <Ionicons name="document-text-outline" size={24} color="#4b5563" />
+            <Text style={styles.menuItemText}>My Incident Reports</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
-          <View style={styles.menuItemLeft}>
-            <Ionicons name="medical-outline" size={24} color="#4b5563" />
-            <Text style={styles.menuItemText}>Emergency Contacts</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/alerts')}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="notifications-outline" size={24} color="#4b5563" />
-            <Text style={styles.menuItemText}>Notification Settings</Text>
+            <Text style={styles.menuItemText}>My Emergency Alerts</Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
@@ -81,7 +140,6 @@ export default function ProfileScreen() {
         <Text style={styles.logoutText}>Log Out</Text>
       </TouchableOpacity>
       
-      {/* Creator Credit */}
       <TouchableOpacity style={styles.creditBlock} onPress={() => Linking.openURL(PORTFOLIO_URL)} activeOpacity={0.7}>
         <Ionicons name="code-slash-outline" size={14} color="#9ca3af" />
         <Text style={styles.creditText}>
@@ -112,7 +170,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#fee2e2', // red-100
+    backgroundColor: '#fee2e2',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -120,7 +178,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#b91c1c', // red-700
+    color: '#b91c1c',
   },
   name: {
     fontSize: 24,
@@ -134,13 +192,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   badge: {
-    backgroundColor: '#dcfce7', // green-100
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
   },
   badgeText: {
-    color: '#15803d', // green-700
+    color: '#15803d',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -151,6 +209,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: '#e5e7eb',
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingRight: 20,
+  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: 'bold',
@@ -159,6 +223,40 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     marginHorizontal: 20,
     marginVertical: 12,
+  },
+  editButton: {
+    color: '#b91c1c',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  infoBlock: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  infoTextReadOnly: {
+    fontSize: 16,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  input: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '500',
+    backgroundColor: '#f3f4f6',
+    padding: 8,
+    borderRadius: 6,
   },
   menuItem: {
     flexDirection: 'row',
@@ -186,7 +284,7 @@ const styles = StyleSheet.create({
     marginTop: 32,
     marginHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#fef2f2', // red-50
+    backgroundColor: '#fef2f2',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#fecaca',

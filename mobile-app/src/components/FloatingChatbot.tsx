@@ -1,96 +1,101 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, TextInput, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { aiAPI } from '../services/api';
+
+interface Message {
+  id: string;
+  text: string;
+  sender: 'user' | 'ai';
+}
 
 export function FloatingChatbot() {
   const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState([
-    { id: 1, sender: 'ai', text: 'Hello! I am your S.A.F.E. AI assistant. How can I help you today?' }
+  const [messages, setMessages] = useState<Message[]>([
+    { id: '1', text: 'Hello! I am your S.A.F.E AI assistant. How can I help you stay safe on campus today?', sender: 'ai' }
   ]);
-
-  const slideAnim = useState(new Animated.Value(300))[0]; // Initial position off-screen
-  const fadeAnim = useState(new Animated.Value(0))[0];
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const insets = useSafeAreaInsets();
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const toggleChat = () => {
     if (isOpen) {
-      // Close
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 300,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        })
-      ]).start(() => setIsOpen(false));
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => setIsOpen(false));
     } else {
-      // Open
       setIsOpen(true);
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        })
-      ]).start();
+      Animated.timing(slideAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   };
 
-  const sendMessage = () => {
-    if (!message.trim()) return;
+  const handleSend = async () => {
+    if (!inputText.trim()) return;
     
-    const userMsg = { id: Date.now(), sender: 'user', text: message };
-    setChatHistory(prev => [...prev, userMsg]);
-    setMessage('');
-    
-    // Mock AI response
-    setTimeout(() => {
-      const aiMsg = { id: Date.now() + 1, sender: 'ai', text: 'I am analyzing your request. If this is an emergency, please use the SOS button.' };
-      setChatHistory(prev => [...prev, aiMsg]);
-    }, 1000);
+    const userMsg: Message = { id: Date.now().toString(), text: inputText, sender: 'user' };
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      const res = await aiAPI.chat(userMsg.text);
+      if (res.success && res.data) {
+        setMessages(prev => [...prev, { id: Date.now().toString() + 'ai', text: res.data.reply, sender: 'ai' }]);
+      } else {
+        setMessages(prev => [...prev, { id: Date.now().toString() + 'err', text: res.error || "Sorry, I'm having trouble connecting right now.", sender: 'ai' }]);
+      }
+    } catch (e) {
+      setMessages(prev => [...prev, { id: Date.now().toString() + 'err', text: "Sorry, I'm having trouble connecting to the network right now.", sender: 'ai' }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <>
-      {/* Floating Action Button */}
-      <TouchableOpacity 
-        style={[styles.fab, isOpen && styles.fabOpen]} 
-        onPress={toggleChat}
-        activeOpacity={0.8}
-      >
-        <Ionicons name={isOpen ? "close" : "chatbubbles"} size={28} color="white" />
-      </TouchableOpacity>
-
-      {/* Chat Window */}
       {isOpen && (
-        <Animated.View style={[
-          styles.chatWindow,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}>
-          <View style={styles.header}>
-            <View style={styles.headerTitleContainer}>
-              <Ionicons name="shield-checkmark" size={20} color="white" />
-              <Text style={styles.headerTitle}>S.A.F.E. Assistant</Text>
+        <Animated.View 
+          style={[
+            styles.chatContainer, 
+            { 
+              opacity: slideAnim,
+              transform: [{
+                translateY: slideAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [500, 0]
+                })
+              }],
+              paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20
+            }
+          ]}
+        >
+          <View style={styles.chatHeader}>
+            <View style={styles.headerTitle}>
+              <Ionicons name="hardware-chip" size={24} color="white" />
+              <Text style={styles.headerText}>S.A.F.E. Assistant</Text>
             </View>
             <TouchableOpacity onPress={toggleChat}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.messagesContainer} contentContainerStyle={{ padding: 16 }}>
-            {chatHistory.map((msg) => (
+          <ScrollView 
+            ref={scrollViewRef}
+            style={styles.messagesContainer}
+            contentContainerStyle={styles.messagesContent}
+            onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+          >
+            {messages.map(msg => (
               <View 
                 key={msg.id} 
                 style={[
@@ -98,96 +103,102 @@ export function FloatingChatbot() {
                   msg.sender === 'user' ? styles.userBubble : styles.aiBubble
                 ]}
               >
-                <Text style={[
-                  styles.messageText,
-                  msg.sender === 'user' ? styles.userMessageText : styles.aiMessageText
-                ]}>
+                <Text style={msg.sender === 'user' ? styles.userText : styles.aiText}>
                   {msg.text}
                 </Text>
               </View>
             ))}
+            {isLoading && (
+              <View style={[styles.messageBubble, styles.aiBubble, { alignSelf: 'flex-start' }]}>
+                <ActivityIndicator size="small" color="#b91c1c" />
+              </View>
+            )}
           </ScrollView>
 
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          >
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Type your message..."
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask about safety..."
                 placeholderTextColor="#9ca3af"
-                value={message}
-                onChangeText={setMessage}
-                onSubmitEditing={sendMessage}
+                onSubmitEditing={handleSend}
               />
-              <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+              <TouchableOpacity 
+                style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]} 
+                onPress={handleSend}
+                disabled={!inputText.trim()}
+              >
                 <Ionicons name="send" size={20} color="white" />
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
         </Animated.View>
       )}
+
+      {!isOpen && (
+        <TouchableOpacity 
+          style={[styles.floatingButton, { bottom: 100 + insets.bottom }]} 
+          onPress={toggleChat}
+        >
+          <Ionicons name="chatbubbles" size={28} color="white" />
+        </TouchableOpacity>
+      )}
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  fab: {
+  floatingButton: {
     position: 'absolute',
-    bottom: 90, // above bottom tabs
     right: 20,
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#b91c1c', // red-700
+    backgroundColor: '#b91c1c',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#b91c1c',
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  chatContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#f9fafb',
     zIndex: 100,
   },
-  fabOpen: {
-    backgroundColor: '#374151',
-  },
-  chatWindow: {
-    position: 'absolute',
-    bottom: 90, // above tabs
-    right: 20,
-    left: 20,
-    height: 400,
-    backgroundColor: 'white',
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-    zIndex: 90,
-    overflow: 'hidden',
-  },
-  header: {
+  chatHeader: {
     backgroundColor: '#b91c1c',
-    padding: 16,
+    paddingTop: 50,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  headerTitleContainer: {
+  headerTitle: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  headerTitle: {
+  headerText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: 10,
   },
   messagesContainer: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+  },
+  messagesContent: {
+    padding: 16,
+    paddingBottom: 32,
   },
   messageBubble: {
     maxWidth: '80%',
@@ -196,31 +207,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   userBubble: {
-    alignSelf: 'flex-end',
     backgroundColor: '#1f2937',
+    alignSelf: 'flex-end',
     borderBottomRightRadius: 4,
   },
   aiBubble: {
+    backgroundColor: 'white',
     alignSelf: 'flex-start',
-    backgroundColor: '#e5e7eb',
     borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  userMessageText: {
+  userText: {
     color: 'white',
+    fontSize: 15,
   },
-  aiMessageText: {
+  aiText: {
     color: '#1f2937',
+    fontSize: 15,
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 12,
     backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: '#e5e7eb',
     alignItems: 'center',
   },
   input: {
@@ -230,15 +241,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#1f2937',
+    maxHeight: 100,
   },
   sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#b91c1c',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    marginLeft: 12,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#fca5a5',
   },
 });
