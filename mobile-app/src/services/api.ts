@@ -10,14 +10,181 @@ const getToken = async () => {
   }
 };
 
+async function apiRequest<T = any>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<{ success: boolean; data?: T; error?: string }> {
+  const token = await getToken();
+
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...headers,
+        ...options.headers,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { success: false, error: data.error || 'Request failed' };
+    }
+
+    return { success: true, data: data.data };
+  } catch (error) {
+    console.error('API request failed:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    };
+  }
+}
+
+// ─── Auth ────────────────────────────────────────────────────
+export const authAPI = {
+  login: async (email: string, password: string) =>
+    apiRequest<{ user: any; token: string }>('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ institutional_email: email, password }),
+    }),
+
+  register: async (data: {
+    full_name: string;
+    institutional_email: string;
+    password: string;
+    phone: string;
+    matric_or_staff_id: string;
+  }) =>
+    apiRequest<{ user: any; token: string }>('/api/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getProfile: async () => apiRequest<{ user: any }>('/api/auth/profile'),
+
+  updateProfile: async (data: { full_name?: string; phone?: string }) =>
+    apiRequest<{ user: any }>('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+
+  logout: async () =>
+    apiRequest('/api/auth/logout', { method: 'POST' }),
+};
+
+// ─── Alerts ──────────────────────────────────────────────────
+export const alertsAPI = {
+  trigger: async (
+    latitude: number,
+    longitude: number,
+    transmission_mode: 'https' | 'mesh' = 'https'
+  ) =>
+    apiRequest<{ alert: any }>('/api/alerts', {
+      method: 'POST',
+      body: JSON.stringify({ latitude, longitude, transmission_mode }),
+    }),
+
+  getAll: async (params?: { resolved?: boolean; acknowledged?: boolean; limit?: number }) => {
+    const qp = new URLSearchParams();
+    if (params?.resolved !== undefined) qp.append('resolved', String(params.resolved));
+    if (params?.acknowledged !== undefined) qp.append('acknowledged', String(params.acknowledged));
+    if (params?.limit) qp.append('limit', String(params.limit));
+    return apiRequest<{ alerts: any[]; total: number }>(`/api/alerts?${qp.toString()}`);
+  },
+
+  getActive: async () =>
+    apiRequest<{ alerts: any[]; count: number }>('/api/alerts/active'),
+
+  acknowledge: async (id: number) =>
+    apiRequest(`/api/alerts/${id}/acknowledge`, { method: 'POST' }),
+
+  resolve: async (id: number) =>
+    apiRequest(`/api/alerts/${id}/resolve`, { method: 'POST' }),
+
+  getById: async (id: number | string) =>
+    apiRequest<{ alert: any }>(`/api/alerts/track/${id}`),
+};
+
+// ─── Incidents ───────────────────────────────────────────────
+export const incidentsAPI = {
+  create: async (data: {
+    category: string;
+    description: string;
+    latitude: number;
+    longitude: number;
+    media_url?: string;
+  }) =>
+    apiRequest<{ incident: any; ai_classification: any }>('/api/incidents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getAll: async (params?: { status?: string; category?: string; limit?: number; offset?: number }) => {
+    const qp = new URLSearchParams();
+    if (params?.status) qp.append('status', params.status);
+    if (params?.category) qp.append('category', params.category);
+    if (params?.limit) qp.append('limit', String(params.limit));
+    if (params?.offset) qp.append('offset', String(params.offset));
+    return apiRequest<{ incidents: any[]; total: number }>(`/api/incidents?${qp.toString()}`);
+  },
+
+  getById: async (id: number) =>
+    apiRequest<{ incident: any }>(`/api/incidents/${id}`),
+
+  getStats: async (period?: number) =>
+    apiRequest<any>(`/api/incidents/stats?period=${period || 7}`),
+};
+
+// ─── Messages ────────────────────────────────────────────────
+export const messagesAPI = {
+  send: async (incident_id: number, content: string) =>
+    apiRequest<{ message: any }>('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({ incident_id, content }),
+    }),
+
+  getByIncident: async (incident_id: number) =>
+    apiRequest<{ messages: any[] }>(`/api/messages/incident/${incident_id}`),
+
+  markRead: async (id: number) =>
+    apiRequest(`/api/messages/${id}/read`, { method: 'PATCH' }),
+};
+
+// ─── Analytics ───────────────────────────────────────────────
+export const analyticsAPI = {
+  getDashboard: async () => apiRequest<any>('/api/analytics/dashboard'),
+
+  getHotspots: async (days?: number) =>
+    apiRequest<{ hotspots: any[] }>(`/api/analytics/hotspots?days=${days || 30}`),
+
+  getTrend: async (period?: number, groupBy?: string) =>
+    apiRequest<any>(`/api/analytics/trend?period=${period || 7}&groupBy=${groupBy || 'day'}`),
+};
+
+// ─── AI ──────────────────────────────────────────────────────
+export const aiAPI = {
+  chat: async (message: string) =>
+    apiRequest<{ reply: string }>('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    }),
+};
+
+// ─── Legacy export for backward compat ───────────────────────
 export const api = {
   get: async (endpoint: string) => {
     const token = await getToken();
     const res = await fetch(`${API_URL}${endpoint}`, {
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-      }
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
     return res.json();
   },
@@ -27,10 +194,10 @@ export const api = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify(data)
+      body: JSON.stringify(data),
     });
     return res.json();
-  }
+  },
 };

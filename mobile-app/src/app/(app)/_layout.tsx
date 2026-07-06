@@ -41,7 +41,7 @@ export default function AppLayout() {
         <Tabs.Screen
           name="map"
           options={{
-            title: 'Campus Map',
+            title: 'Map',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="map" size={size} color={color} />
             ),
@@ -57,12 +57,29 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="alerts"
+          options={{
+            title: 'Alerts',
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="notifications" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="person" size={size} color={color} />
             ),
+          }}
+        />
+        {/* Hide incidents from tab bar — accessed from Profile */}
+        <Tabs.Screen
+          name="incidents"
+          options={{
+            href: null,
+            title: 'My Reports',
           }}
         />
       </Tabs>
