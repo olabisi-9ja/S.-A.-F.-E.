@@ -40,7 +40,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             Safety, <br/>
             <span className="text-red-600 inline-flex items-center gap-4">
               Reimagined.
-              <div className="w-4 h-4 rounded-full bg-red-600 animate-pulse mt-4 hidden md:block"></div>
             </span>
           </h1>
           
