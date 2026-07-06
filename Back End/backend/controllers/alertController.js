@@ -301,3 +301,37 @@ export const getActiveAlerts = async (req, res) => {
     });
   }
 };
+
+export const getAlertById = async (req, res) => {
+  try {
+    const alert = await Alert.findByPk(req.params.id, {
+      include: [{ association: 'user', attributes: ['full_name', 'phone'] }]
+    });
+    if (!alert) return res.status(404).json({ success: false, error: 'Alert not found' });
+    res.json({ success: true, data: { alert } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to fetch alert' });
+  }
+};
+
+export const updateAlertLocation = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+    const alert = await Alert.findByPk(req.params.id);
+    if (!alert) return res.status(404).json({ success: false, error: 'Alert not found' });
+    
+    // Only the user who created it can update it
+    if (alert.user_id !== req.userId) {
+      return res.status(403).json({ success: false, error: 'Unauthorized' });
+    }
+
+    await alert.update({ latitude, longitude });
+    
+    // Broadcast update to admins
+    req.io?.emit('alert_location_update', { alertId: alert.id, latitude, longitude });
+    
+    res.json({ success: true, data: { alert } });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Failed to update location' });
+  }
+};

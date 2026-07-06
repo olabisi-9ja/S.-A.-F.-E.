@@ -17,6 +17,7 @@ import { VerifyEmailPage } from './pages/auth/VerifyEmailPage';
 import { HomePage } from './pages/user/HomePage';
 import { ReportPage } from './pages/user/ReportPage';
 import { MyIncidentsPage } from './pages/user/MyIncidentsPage';
+import { LiveTrackerPage } from './pages/user/LiveTrackerPage';
 import { AlertsPage } from './pages/AlertsPage';
 
 // Admin pages
@@ -31,7 +32,12 @@ function ProtectedRoute({ children, requireAdmin = false }: { children: React.Re
   const location = useLocation();
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-500 font-medium">Authenticating...</p>
+      </div>
+    );
   }
 
   if (!isAuthenticated || !user) {
@@ -55,7 +61,12 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, isLoading } = useAuth();
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">
+        <div className="w-12 h-12 border-4 border-red-200 border-t-red-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-500 font-medium">Connecting...</p>
+      </div>
+    );
   }
 
   if (isAuthenticated && user) {
@@ -118,13 +129,22 @@ function Router() {
         <Route path="/admin-map" element={<ProtectedRoute requireAdmin><AppLayout><AdminMapPage /></AppLayout></ProtectedRoute>} />
         <Route path="/admin-users" element={<ProtectedRoute requireAdmin><AppLayout><AdminUsersPage /></AppLayout></ProtectedRoute>} />
 
+        {/* Live Tracking (Public/Shared) */}
+        <Route path="/track/:id" element={<LiveTrackerPage />} />
+
         {/* 404 Fallback */}
         <Route path="*" element={
-          <div className="min-h-screen bg-gray-50 pt-14 flex items-center justify-center">
-            <div className="text-center text-gray-500">
-              <p className="text-lg font-semibold">Page not found</p>
-              <a href="/" className="mt-3 text-red-700 hover:underline text-sm block">Return to home</a>
+          <div className="min-h-screen bg-white pt-14 flex flex-col items-center justify-center p-4">
+            <div className="w-24 h-24 bg-red-50 rounded-full flex items-center justify-center mb-6">
+              <span className="text-4xl font-black text-red-600">404</span>
             </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Page Not Found</h2>
+            <p className="text-gray-500 text-center max-w-md mb-8">
+              The page you are looking for doesn't exist or has been moved. Please check the URL or return to safety.
+            </p>
+            <a href="/" className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold transition-colors shadow-sm">
+              Return Home
+            </a>
           </div>
         } />
       </Routes>

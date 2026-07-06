@@ -158,6 +158,17 @@ export const alertsAPI = {
     return await apiRequest(`/alerts/${id}/acknowledge`, { method: 'POST' });
   },
 
+  getById: async (id: number | string) => {
+    return await apiRequest<{ alert: Alert & { user_name?: string; user?: { phone?: string; full_name?: string } } }>(`/alerts/track/${id}`);
+  },
+
+  updateLocation: async (id: number | string, latitude: number, longitude: number) => {
+    return await apiRequest(`/alerts/${id}/location`, {
+      method: 'PATCH',
+      body: JSON.stringify({ latitude, longitude }),
+    });
+  },
+
   resolve: async (id: number) => {
     return await apiRequest(`/alerts/${id}/resolve`, { method: 'POST' });
   },

@@ -1,4 +1,5 @@
 import { AlertTriangle, FileText, CheckCircle, Clock, TrendingUp, Radio, Wifi } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -33,6 +34,7 @@ const severityBadge = (score: number): 'danger' | 'warning' | 'success' | 'defau
 
 export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const { incidents, alerts, acknowledgeAlert, resolveAlert } = useApp();
+  const navigate = useNavigate();
 
   const totalIncidents = incidents.length;
   const activeAlerts = alerts.filter(a => !a.resolved).length;
@@ -133,6 +135,12 @@ export function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         className="text-xs px-2.5 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
                       >
                         Resolve
+                      </button>
+                      <button
+                        onClick={() => navigate('/track/' + alert.id)}
+                        className="text-xs px-2.5 py-1 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium border border-red-200"
+                      >
+                        Live Track
                       </button>
                     </div>
                   </CardContent>

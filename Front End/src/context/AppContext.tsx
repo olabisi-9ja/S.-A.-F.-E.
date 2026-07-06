@@ -29,7 +29,7 @@ interface AppContextType {
   refreshData: () => Promise<void>;
   addIncident: (inc: Omit<Incident, 'id' | 'created_at' | 'status' | 'ai_severity_score' | 'ai_category_suggestion'>) => Promise<Incident | null>;
   updateIncidentStatus: (id: number, status: IncidentStatus, officer?: string) => Promise<boolean>;
-  triggerAlert: (lat: number, lng: number, mode: 'https' | 'mesh') => Promise<boolean>;
+  triggerAlert: (lat: number, lng: number, mode: 'https' | 'mesh') => Promise<number | null>;
   acknowledgeAlert: (id: number) => Promise<boolean>;
   resolveAlert: (id: number) => Promise<boolean>;
   sendMessage: (incident_id: number, sender_id: number, sender_name: string, sender_role: string, content: string) => Promise<Message | null>;
@@ -167,15 +167,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const pending = pendingStr ? JSON.parse(pendingStr) : [];
       pending.push({ lat, lng, timestamp: new Date().toISOString() });
       localStorage.setItem('safe_pending_alerts', JSON.stringify(pending));
-      return true; // Consider it locally "sent" for mesh processing later
+      return null; // Consider it locally "sent" for mesh processing later
     }
 
     const result = await alertsAPI.trigger(lat, lng, mode);
     if (result.success && result.data) {
       setAlerts(prev => [result.data!.alert, ...prev]);
-      return true;
+      return result.data!.alert.id;
     }
-    return false;
+    return null;
   }, []);
 
   const acknowledgeAlert = useCallback(async (id: number) => {

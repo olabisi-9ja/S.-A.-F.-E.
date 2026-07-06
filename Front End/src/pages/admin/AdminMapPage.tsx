@@ -1,4 +1,8 @@
-import { MapPin, Radio, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { MapPin, Radio, AlertTriangle, ArrowLeft, Navigation } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AdminLayout } from '../../components/layout/AdminLayout';
+import { useAuth } from '../../context/AuthContext';
+import 'leaflet/dist/leaflet.css';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -26,6 +30,7 @@ const alertIcon = L.divIcon({
 
 export function AdminMapPage() {
   const { incidents, alerts } = useApp();
+  const navigate = useNavigate();
 
   const activeAlerts = alerts.filter(a => !a.resolved);
   const realHotspots = getRealHotspots(incidents);
@@ -156,6 +161,13 @@ export function AdminMapPage() {
                   {alert.transmission_mode === 'mesh' && (
                     <Badge variant="mesh"><Radio className="w-3 h-3" />Mesh</Badge>
                   )}
+                  <button
+                    onClick={() => navigate('/track/' + alert.id)}
+                    className="ml-auto text-xs px-2.5 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition font-medium border border-red-200 flex items-center gap-1 shrink-0"
+                  >
+                    <Navigation className="w-3 h-3" />
+                    Track
+                  </button>
                 </div>
               ))}
             </CardContent>

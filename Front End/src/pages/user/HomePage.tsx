@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, FileText, MessageSquare, Clock, Zap, Radio, CheckCircle } from 'lucide-react';
+import { AlertTriangle, FileText, MessageSquare, Clock, Zap, Radio, CheckCircle, Navigation } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -29,7 +29,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
   const myIncidents = incidents.filter(i => i.reporter_id === (user?.id ?? 99)).slice(0, 3);
 
-  const handleSOS = async () => {
+  const handleSOS = async (startTracking = false) => {
     if (sosState !== 'idle') return;
     setSosState('sending');
 
@@ -46,15 +46,26 @@ export function HomePage({ onNavigate }: HomePageProps) {
       const { latitude, longitude } = position.coords;
       const mesh = !navigator.onLine; // Only use mesh if completely offline
       setUsedMesh(mesh);
-      await triggerAlert(latitude, longitude, mesh ? 'mesh' : 'https');
+      const alertId = await triggerAlert(latitude, longitude, mesh ? 'mesh' : 'https');
       setSosState('sent');
+      
+      // If Live Tracker was requested and an ID was returned, navigate to it
+      if (startTracking && alertId) {
+        onNavigate(`track/${alertId}`);
+        return;
+      }
     } catch (error) {
       // Fallback instantly if location fails
       console.warn('Geolocation failed, using fallback.', error);
       const mesh = !navigator.onLine;
       setUsedMesh(mesh);
-      await triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https'); // Default KWASU coordinates
+      const alertId = await triggerAlert(8.6762, 4.1680, mesh ? 'mesh' : 'https'); // Default KWASU coordinates
       setSosState('sent');
+
+      if (startTracking && alertId) {
+        onNavigate(`track/${alertId}`);
+        return;
+      }
     }
 
     setTimeout(() => setSosState('idle'), 5000);
@@ -79,7 +90,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
               <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />
             )}
             <button
-              onClick={handleSOS}
+              onClick={() => handleSOS(false)}
               disabled={sosState === 'sending'}
               className={`w-40 h-40 rounded-full flex flex-col items-center justify-center shadow-2xl transition-all duration-200 font-extrabold text-white select-none
                 ${sosState === 'idle' ? 'bg-red-600 hover:bg-red-700 active:scale-95' : ''}
@@ -126,10 +137,10 @@ export function HomePage({ onNavigate }: HomePageProps) {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           <button
             onClick={() => onNavigate('report')}
-            className="flex flex-col items-center gap-2 p-5 bg-white border border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition text-gray-700 group"
+            className="flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition text-gray-700 group"
           >
             <div className="w-12 h-12 rounded-full bg-red-50 group-hover:bg-red-100 flex items-center justify-center transition">
               <FileText className="w-6 h-6 text-red-700" />
@@ -138,11 +149,22 @@ export function HomePage({ onNavigate }: HomePageProps) {
           </button>
 
           <button
-            onClick={() => onNavigate('my-incidents')}
-            className="flex flex-col items-center gap-2 p-5 bg-white border border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition text-gray-700 group"
+            onClick={() => handleSOS(true)}
+            disabled={sosState !== 'idle'}
+            className="flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-md transition text-gray-700 group disabled:opacity-50"
           >
             <div className="w-12 h-12 rounded-full bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center transition">
-              <Clock className="w-6 h-6 text-blue-600" />
+              <Navigation className="w-6 h-6 text-blue-600" />
+            </div>
+            <span className="text-sm font-semibold text-center leading-tight">Live Track<br/>& Share</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate('my-incidents')}
+            className="flex flex-col items-center gap-2 p-4 bg-white border border-gray-200 rounded-xl hover:border-purple-300 hover:shadow-md transition text-gray-700 group col-span-2 md:col-span-1"
+          >
+            <div className="w-12 h-12 rounded-full bg-purple-50 group-hover:bg-purple-100 flex items-center justify-center transition">
+              <Clock className="w-6 h-6 text-purple-600" />
             </div>
             <span className="text-sm font-semibold">My Reports</span>
           </button>
