@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, FlatList, Re
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { alertsAPI, incidentsAPI } from '@/services/api';
+import { sendAlertWithFallback } from '@/services/mesh';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 
@@ -63,23 +64,23 @@ export default function HomeScreen() {
       if (!loc) {
         loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       }
+      const latitude = loc?.coords.latitude || 8.6762;
+      const longitude = loc?.coords.longitude || 4.1680;
 
-      const result = await alertsAPI.trigger(
-        loc?.coords.latitude || 8.6762,
-        loc?.coords.longitude || 4.1680,
-        'https'
-      );
+      const delivery = await sendAlertWithFallback(user?.id ?? 0, latitude, longitude);
 
-      if (result.success) {
+      if (delivery.mode === 'https') {
         Alert.alert('🚨 SOS Triggered!', 'Campus security has been notified of your location.');
-        setSosState('sent');
-        fetchData(); // Refresh recent alerts
       } else {
-        Alert.alert('SOS Sent (Offline)', 'SMS fallback will deliver your alert.');
-        setSosState('sent');
+        Alert.alert(
+          '🚨 SOS Queued (Offline)',
+          'No connection detected. Your alert is encrypted and queued — it will relay to nearby S.A.F.E. devices and auto-sync the moment any device reaches the internet. An SMS fallback will also fire if unacknowledged.'
+        );
       }
+      setSosState('sent');
+      fetchData(); // Refresh recent alerts
     } catch (err) {
-      Alert.alert('SOS Sent (Offline)', 'SMS fallback will deliver your alert.');
+      Alert.alert('SOS Sent (Offline)', 'Your alert is queued and will deliver via mesh relay or SMS fallback.');
       setSosState('sent');
     }
 
@@ -105,21 +106,20 @@ export default function HomeScreen() {
               let loc = await Location.getLastKnownPositionAsync({});
               if (!loc) loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
 
-              // We use alertsAPI.trigger for the SOS — the category is metadata
-              const result = await alertsAPI.trigger(
+              const delivery = await sendAlertWithFallback(
+                user?.id ?? 0,
                 loc?.coords.latitude || 8.6762,
-                loc?.coords.longitude || 4.1680,
-                'https'
+                loc?.coords.longitude || 4.1680
               );
 
-              if (result.success) {
+              if (delivery.mode === 'https') {
                 Alert.alert('✅ Alert Sent', `${category} emergency alert sent to campus security.`);
-                fetchData();
               } else {
-                Alert.alert('Alert Queued', 'Your alert will be delivered via SMS fallback.');
+                Alert.alert('Alert Queued', 'No connection detected — your alert is encrypted and queued for mesh relay / SMS fallback.');
               }
+              fetchData();
             } catch {
-              Alert.alert('Alert Queued', 'Your alert will be delivered via SMS fallback.');
+              Alert.alert('Alert Queued', 'Your alert is encrypted and queued for mesh relay / SMS fallback.');
             }
           },
         },
@@ -225,7 +225,7 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Alerts</Text>
-                <TouchableOpacity onPress={() => router.push('/(app)/alerts')}>
+                <TouchableOpacity onPress={() => router.push('/(app)/alerts' as any)}>
                   <Text style={styles.seeAll}>See All</Text>
                 </TouchableOpacity>
               </View>
@@ -251,7 +251,7 @@ export default function HomeScreen() {
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Recent Reports</Text>
-                <TouchableOpacity onPress={() => router.push('/(app)/incidents')}>
+                <TouchableOpacity onPress={() => router.push('/(app)/incidents' as any)}>
                   <Text style={styles.seeAll}>See All</Text>
                 </TouchableOpacity>
               </View>

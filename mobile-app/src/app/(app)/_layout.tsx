@@ -1,13 +1,28 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
+import React, { useEffect } from 'react';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform, View } from 'react-native';
 import { FloatingChatbot } from '../../components/FloatingChatbot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { addNotificationResponseListener } from '@/services/notifications';
 
 export default function AppLayout() {
   const insets = useSafeAreaInsets();
-  
+  const router = useRouter();
+
+  useEffect(() => {
+    // Tapping a push notification (new message, status update, alert
+    // acknowledged/resolved) takes the user straight to the relevant screen.
+    const unsubscribe = addNotificationResponseListener((data) => {
+      if (data.type === 'incident' || data.type === 'message') {
+        if (data.incidentId) router.push(`/(app)/incident/${data.incidentId}` as any);
+      } else if (data.type === 'alert') {
+        router.push('/(app)/alerts' as any);
+      }
+    });
+    return unsubscribe;
+  }, [router]);
+
   return (
     <View style={{ flex: 1 }}>
       <Tabs
@@ -80,6 +95,14 @@ export default function AppLayout() {
           options={{
             href: null,
             title: 'My Reports',
+          }}
+        />
+        {/* Hidden — two-way chat for a single incident, pushed from the incidents list */}
+        <Tabs.Screen
+          name="incident/[id]"
+          options={{
+            href: null,
+            headerShown: false,
           }}
         />
       </Tabs>

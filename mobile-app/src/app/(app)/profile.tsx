@@ -98,7 +98,7 @@ export default function ProfileScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Activity</Text>
         
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/incidents')}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/incidents' as any)}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="document-text-outline" size={24} color="#4b5563" />
             <Text style={styles.menuItemText}>My Incident Reports</Text>
@@ -106,7 +106,7 @@ export default function ProfileScreen() {
           <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/alerts')}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/(app)/alerts' as any)}>
           <View style={styles.menuItemLeft}>
             <Ionicons name="notifications-outline" size={24} color="#4b5563" />
             <Text style={styles.menuItemText}>My Emergency Alerts</Text>

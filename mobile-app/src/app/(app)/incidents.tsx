@@ -95,7 +95,11 @@ export default function IncidentsScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#b91c1c" />}
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.7}
+              onPress={() => router.push(`/(app)/incident/${item.id}` as any)}
+            >
               <View style={styles.cardHeader}>
                 <View style={styles.badgeContainer}>
                   <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
@@ -118,6 +122,12 @@ export default function IncidentsScreen() {
                     </Text>
                   </View>
                 )}
+
+                <View style={styles.messageRow}>
+                  <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6b7280" />
+                  <Text style={styles.messageRowText}>Message security about this report</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
+                </View>
               </View>
             </TouchableOpacity>
           )}
@@ -281,6 +291,20 @@ const styles = StyleSheet.create({
     color: '#4338ca', // indigo-700
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 6,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  messageRowText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6b7280',
     marginLeft: 6,
   },
 });

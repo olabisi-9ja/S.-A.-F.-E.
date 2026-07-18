@@ -1,0 +1,2374 @@
+diff --git a/Back End/backend/controllers/alertController.js b/Back End/backend/controllers/alertController.js
+index 513e7ce..2cd1196 100644
+--- a/Back End/backend/controllers/alertController.js	
++++ b/Back End/backend/controllers/alertController.js	
+@@ -1,6 +1,7 @@
+ import { Op } from 'sequelize';
+ import { Alert, User, Notification, MeshPacket } from '../models/index.js';
+ import { sendSMS } from '../services/smsService.js';
++import { pushToAdmins, pushToUser } from '../services/pushService.js';
+ import logger from '../utils/logger.js';
+ 
+ export const smsTimeouts = new Map();
+@@ -57,6 +58,13 @@ export const triggerAlert = async (req, res) => {
+       timestamp: alert.created_at,
+     });
+ 
++    // Push notification to security personnel (fire-and-forget)
++    pushToAdmins({
++      title: '🚨 EMERGENCY ALERT',
++      body: `${user.full_name} triggered an emergency alert nearby.`,
++      data: { type: 'alert', alertId: alert.id },
++    });
++
+     // Schedule SMS fallback (15 seconds if not acknowledged)
+     const smsTimeout = setTimeout(async () => {
+       try {
+@@ -145,6 +153,11 @@ export const acknowledgeAlert = async (req, res) => {
+         related_entity_type: 'alert',
+         related_entity_id: alert.id,
+       });
++      pushToUser(user.id, {
++        title: 'Alert Acknowledged',
++        body: 'Security has acknowledged your emergency alert.',
++        data: { type: 'alert', alertId: alert.id },
++      });
+     }
+ 
+     // Emit socket event
+@@ -205,6 +218,11 @@ export const resolveAlert = async (req, res) => {
+         related_entity_type: 'alert',
+         related_entity_id: alert.id,
+       });
++      pushToUser(user.id, {
++        title: 'Alert Resolved',
++        body: 'Your emergency alert has been resolved by security personnel.',
++        data: { type: 'alert', alertId: alert.id },
++      });
+     }
+ 
+     // Emit socket event
+diff --git a/Back End/backend/controllers/authController.js b/Back End/backend/controllers/authController.js
+index 2f2f3ed..5da73de 100644
+--- a/Back End/backend/controllers/authController.js	
++++ b/Back End/backend/controllers/authController.js	
+@@ -193,11 +193,12 @@ export const getProfile = async (req, res) => {
+ 
+ export const updateProfile = async (req, res) => {
+   try {
+-    const { full_name, phone } = req.body;
++    const { full_name, phone, push_token } = req.body;
+     const user = await User.findByPk(req.userId);
+ 
+     if (full_name) user.full_name = full_name;
+     if (phone) user.phone = phone;
++    if (push_token) user.push_token = push_token;
+ 
+     await user.save();
+     res.json({ success: true, message: 'Profile updated successfully.', data: { user } });
+diff --git a/Back End/backend/controllers/incidentController.js b/Back End/backend/controllers/incidentController.js
+index d877d48..24be00e 100644
+--- a/Back End/backend/controllers/incidentController.js	
++++ b/Back End/backend/controllers/incidentController.js	
+@@ -4,6 +4,7 @@ import { Incident, User, Message, Notification } from '../models/index.js';
+ import { sendSMS } from '../services/smsService.js';
+ import logger from '../utils/logger.js';
+ import { generateUploadURL } from '../services/s3Service.js';
++import { pushToAdmins, pushToUser } from '../services/pushService.js';
+ import validator from 'validator';
+ 
+ export const reportTimeouts = new Map();
+@@ -72,6 +73,27 @@ async function classifyIncident(description) {
+   }
+ }
+ 
++// Lets the mobile app show the AI's suggested category/severity BEFORE the
++// user submits, so they can confirm or override it (FR: AI-assisted
++// classification with human-in-the-loop confirmation).
++export const previewClassification = async (req, res) => {
++  try {
++    const { description } = req.body;
++    if (!description || description.trim().length < 5) {
++      return res.status(400).json({
++        success: false,
++        error: 'A description of at least 5 characters is required.',
++      });
++    }
++
++    const aiResult = await classifyIncident(description);
++    res.json({ success: true, data: { ai_classification: aiResult } });
++  } catch (error) {
++    logger.error('Preview classification error:', error);
++    res.status(500).json({ success: false, error: 'Failed to classify description.' });
++  }
++};
++
+ export const createIncident = async (req, res) => {
+   try {
+     const { category, description, latitude, longitude, media_url } = req.body;
+@@ -88,10 +110,11 @@ export const createIncident = async (req, res) => {
+ 
+     const safeDescription = validator.escape(description);
+ 
+-    // Create incident
++    // The user has already seen the AI suggestion via /incidents/classify and
++    // may confirm or override it, so their chosen category wins here.
+     const incident = await Incident.create({
+       reporter_id: req.userId,
+-      category: aiResult.ai_category_suggestion || category,
++      category: category || aiResult.ai_category_suggestion,
+       description: safeDescription,
+       latitude,
+       longitude,
+@@ -133,6 +156,13 @@ export const createIncident = async (req, res) => {
+       is_suspicious: incident.ai_is_suspicious,
+     });
+ 
++    // Push notification to security personnel (fire-and-forget)
++    pushToAdmins({
++      title: 'New Incident Reported',
++      body: `${reporter.full_name} reported a ${incident.category} incident.`,
++      data: { type: 'incident', incidentId: incident.id },
++    });
++
+     // Schedule SMS fallback for 15 minutes if not acknowledged
+     const fallbackTimeout = setTimeout(async () => {
+       try {
+@@ -319,6 +349,12 @@ export const updateIncident = async (req, res) => {
+         related_entity_type: 'incident',
+         related_entity_id: incident.id,
+       });
++
++      pushToUser(reporter.id, {
++        title: 'Incident Status Updated',
++        body: `Your incident #${id} status is now: ${status}`,
++        data: { type: 'incident', incidentId: incident.id },
++      });
+     }
+ 
+     // Emit socket event
+diff --git a/Back End/backend/controllers/meshController.js b/Back End/backend/controllers/meshController.js
+index e3d446c..b2760bc 100644
+--- a/Back End/backend/controllers/meshController.js	
++++ b/Back End/backend/controllers/meshController.js	
+@@ -3,6 +3,7 @@ import { Alert, MeshPacket, User, Notification } from '../models/index.js';
+ import { Op, Sequelize } from 'sequelize';
+ import logger from '../utils/logger.js';
+ import { smsTimeouts } from './alertController.js';
++import { pushToAdmins } from '../services/pushService.js';
+ 
+ const MESH_ENCRYPTION_KEY = process.env.MESH_ENCRYPTION_KEY || 'SAFE_MESH_KEY_32_CHARACTERS_LONG';
+ 
+@@ -113,6 +114,13 @@ export const syncMeshPacket = async (req, res) => {
+       synced_at: new Date().toISOString(),
+     });
+ 
++    // Push notification to security personnel (fire-and-forget)
++    pushToAdmins({
++      title: '🚨 MESH EMERGENCY ALERT',
++      body: `${user.full_name} triggered emergency via offline Mesh relay.`,
++      data: { type: 'alert', alertId: alert.id },
++    });
++
+     // Schedule SMS fallback
+     const smsTimeout = setTimeout(async () => {
+       try {
+diff --git a/Back End/backend/controllers/messageController.js b/Back End/backend/controllers/messageController.js
+index 63b11db..15fd8d1 100644
+--- a/Back End/backend/controllers/messageController.js	
++++ b/Back End/backend/controllers/messageController.js	
+@@ -1,6 +1,7 @@
+ import { Message, Incident, User, Notification } from '../models/index.js';
+ import { Op } from 'sequelize';
+ import logger from '../utils/logger.js';
++import { pushToUser, pushToAdmins } from '../services/pushService.js';
+ 
+ export const sendMessage = async (req, res) => {
+   try {
+@@ -48,15 +49,43 @@ export const sendMessage = async (req, res) => {
+ 
+     // Notify other party
+     const otherUserId = isReporter ? incident.assigned_officer_id : incident.reporter_id;
++    const preview = `${sender.full_name}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`;
++
+     if (otherUserId) {
+       await Notification.create({
+         recipient_id: otherUserId,
+         type: 'message',
+         title: 'New Message',
+-        content: `${sender.full_name}: ${content.substring(0, 100)}${content.length > 100 ? '...' : ''}`,
++        content: preview,
+         related_entity_type: 'message',
+         related_entity_id: message.id,
+       });
++      pushToUser(otherUserId, {
++        title: 'New Message',
++        body: preview,
++        data: { type: 'message', incidentId: incident_id },
++      });
++    } else if (isReporter) {
++      // No officer assigned yet — alert all security personnel so someone can respond.
++      const admins = await User.findAll({
++        where: { role: { [Op.in]: ['security_admin', 'super_admin'] } },
++        attributes: ['id'],
++      });
++      await Notification.bulkCreate(
++        admins.map(admin => ({
++          recipient_id: admin.id,
++          type: 'message',
++          title: 'New Message',
++          content: preview,
++          related_entity_type: 'message',
++          related_entity_id: message.id,
++        }))
++      );
++      pushToAdmins({
++        title: 'New Message',
++        body: preview,
++        data: { type: 'message', incidentId: incident_id },
++      });
+     }
+ 
+     // Emit socket event to incident room
+diff --git a/Back End/backend/models/User.js b/Back End/backend/models/User.js
+index f08446a..317f738 100644
+--- a/Back End/backend/models/User.js	
++++ b/Back End/backend/models/User.js	
+@@ -45,6 +45,10 @@ const User = sequelize.define('User', {
+     type: DataTypes.STRING(20),
+     allowNull: true,
+   },
++  push_token: {
++    type: DataTypes.STRING(255),
++    allowNull: true,
++  },
+   email_verified: {
+     type: DataTypes.BOOLEAN,
+     defaultValue: false,
+diff --git a/Back End/backend/package-lock.json b/Back End/backend/package-lock.json
+index b2185ff..20232b3 100644
+--- a/Back End/backend/package-lock.json	
++++ b/Back End/backend/package-lock.json	
+@@ -19,6 +19,7 @@
+         "bcrypt": "^5.1.0",
+         "cors": "^2.8.5",
+         "dotenv": "^16.3.1",
++        "expo-server-sdk": "^6.1.0",
+         "express": "^4.18.2",
+         "express-rate-limit": "^8.5.2",
+         "google-auth-library": "^10.9.0",
+@@ -1726,6 +1727,12 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/err-code": {
++      "version": "2.0.3",
++      "resolved": "https://registry.npmjs.org/err-code/-/err-code-2.0.3.tgz",
++      "integrity": "sha512-2bmlRpNKBxT/CRmPOlyISQpNj+qSeYvcym/uT0Jx2bMOlKLtSy1ZmLuVxSEKKyor/N5yhvp/ZiG1oE3DEYMSFA==",
++      "license": "MIT"
++    },
+     "node_modules/es-define-property": {
+       "version": "1.0.1",
+       "resolved": "https://registry.npmjs.org/es-define-property/-/es-define-property-1.0.1.tgz",
+@@ -1795,6 +1802,29 @@
+         "node": ">=6"
+       }
+     },
++    "node_modules/expo-server-sdk": {
++      "version": "6.1.0",
++      "resolved": "https://registry.npmjs.org/expo-server-sdk/-/expo-server-sdk-6.1.0.tgz",
++      "integrity": "sha512-ISuax1AQ7cpM5RAqcu8gVcoLL0ZKskJ5OLoMWmdITBe9nYjTucjdGyBq817YkIvTcj1pAUwx+9toUT7l/V7thA==",
++      "license": "MIT",
++      "dependencies": {
++        "promise-limit": "^2.7.0",
++        "promise-retry": "^2.0.1",
++        "undici": "^7.2.0"
++      },
++      "engines": {
++        "node": ">=20"
++      }
++    },
++    "node_modules/expo-server-sdk/node_modules/undici": {
++      "version": "7.28.0",
++      "resolved": "https://registry.npmjs.org/undici/-/undici-7.28.0.tgz",
++      "integrity": "sha512-cRZYrTDwWznlnRiPjggAGxZXanty6M8RV1ff8Wm4LWXBp7/IG8v5DnOm74DtUBp9OONpK75YlPnIjQqX0dBDtA==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=20.18.1"
++      }
++    },
+     "node_modules/exponential-backoff": {
+       "version": "3.1.3",
+       "resolved": "https://registry.npmjs.org/exponential-backoff/-/exponential-backoff-3.1.3.tgz",
+@@ -3660,6 +3690,34 @@
+       "integrity": "sha512-3ouUOpQhtgrbOa17J7+uxOTpITYWaGP7/AhoR3+A+/1e9skrzelGi/dXzEYyvbxubEF6Wn2ypscTKiKJFFn1ag==",
+       "license": "MIT"
+     },
++    "node_modules/promise-limit": {
++      "version": "2.7.0",
++      "resolved": "https://registry.npmjs.org/promise-limit/-/promise-limit-2.7.0.tgz",
++      "integrity": "sha512-7nJ6v5lnJsXwGprnGXga4wx6d1POjvi5Qmf1ivTRxTjH4Z/9Czja/UCMLVmB9N93GeWOU93XaFaEt6jbuoagNw==",
++      "license": "ISC"
++    },
++    "node_modules/promise-retry": {
++      "version": "2.0.1",
++      "resolved": "https://registry.npmjs.org/promise-retry/-/promise-retry-2.0.1.tgz",
++      "integrity": "sha512-y+WKFlBR8BGXnsNlIHFGPZmyDf3DFMoLhaflAnyZgV6rG6xu+JwesTo2Q9R6XwYmtmwAFCkAk3e35jEdoeh/3g==",
++      "license": "MIT",
++      "dependencies": {
++        "err-code": "^2.0.2",
++        "retry": "^0.12.0"
++      },
++      "engines": {
++        "node": ">=10"
++      }
++    },
++    "node_modules/promise-retry/node_modules/retry": {
++      "version": "0.12.0",
++      "resolved": "https://registry.npmjs.org/retry/-/retry-0.12.0.tgz",
++      "integrity": "sha512-9LkiTwjUh6rT555DtE9rTX+BKByPfrMzEAtnlEtdEwr3Nkffwiihqe2bWADg+OQRjt9gl6ICdmB/ZFDCGAtSow==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 4"
++      }
++    },
+     "node_modules/protobufjs": {
+       "version": "7.6.4",
+       "resolved": "https://registry.npmjs.org/protobufjs/-/protobufjs-7.6.4.tgz",
+diff --git a/Back End/backend/package.json b/Back End/backend/package.json
+index 989b5c1..98925a6 100644
+--- a/Back End/backend/package.json	
++++ b/Back End/backend/package.json	
+@@ -21,6 +21,7 @@
+     "bcrypt": "^5.1.0",
+     "cors": "^2.8.5",
+     "dotenv": "^16.3.1",
++    "expo-server-sdk": "^6.1.0",
+     "express": "^4.18.2",
+     "express-rate-limit": "^8.5.2",
+     "google-auth-library": "^10.9.0",
+diff --git a/Back End/backend/routes/incidents.js b/Back End/backend/routes/incidents.js
+index fa32061..30a35bf 100644
+--- a/Back End/backend/routes/incidents.js	
++++ b/Back End/backend/routes/incidents.js	
+@@ -6,6 +6,7 @@ import {
+   updateIncident,
+   getIncidentStats,
+   getUploadUrl,
++  previewClassification,
+ } from '../controllers/incidentController.js';
+ import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
+ 
+@@ -17,6 +18,9 @@ router.use(authMiddleware);
+ // Get S3 Presigned URL for uploads
+ router.get('/upload-url', getUploadUrl);
+ 
++// Preview AI classification for a description before final submission
++router.post('/classify', previewClassification);
++
+ // Create incident (students/staff)
+ router.post('/', createIncident);
+ 
+diff --git a/Back End/backend/services/pushService.js b/Back End/backend/services/pushService.js
+new file mode 100644
+index 0000000..06567ff
+--- /dev/null
++++ b/Back End/backend/services/pushService.js	
+@@ -0,0 +1,60 @@
++import { Expo } from 'expo-server-sdk';
++import { User } from '../models/index.js';
++import logger from '../utils/logger.js';
++
++const expo = new Expo();
++
++/**
++ * Send an Expo push notification to a single user by id.
++ * Best-effort: never throws, so it can safely be fired-and-forgotten
++ * alongside the existing in-app Notification.create() calls.
++ */
++export async function pushToUser(userId, { title, body, data = {} }) {
++  try {
++    if (!userId) return;
++    const user = await User.findByPk(userId, { attributes: ['push_token'] });
++    const token = user?.push_token;
++    if (!token || !Expo.isExpoPushToken(token)) return;
++
++    const messages = [
++      {
++        to: token,
++        sound: 'default',
++        priority: 'high',
++        title,
++        body,
++        data,
++      },
++    ];
++
++    const chunks = expo.chunkPushNotifications(messages);
++    for (const chunk of chunks) {
++      await expo.sendPushNotificationsAsync(chunk);
++    }
++  } catch (error) {
++    logger.info('Push notification failed (non-fatal):', error.message);
++  }
++}
++
++/**
++ * Send the same push notification to many users at once.
++ */
++export async function pushToUsers(userIds, payload) {
++  await Promise.all((userIds || []).map((id) => pushToUser(id, payload)));
++}
++
++/**
++ * Push to every security_admin / super_admin user.
++ */
++export async function pushToAdmins(payload) {
++  try {
++    const { Op } = await import('sequelize');
++    const admins = await User.findAll({
++      where: { role: { [Op.in]: ['security_admin', 'super_admin'] } },
++      attributes: ['id'],
++    });
++    await pushToUsers(admins.map((a) => a.id), payload);
++  } catch (error) {
++    logger.info('Push to admins failed (non-fatal):', error.message);
++  }
++}
+diff --git a/mobile-app/app.json b/mobile-app/app.json
+index bdd07be..0cf8eec 100644
+--- a/mobile-app/app.json
++++ b/mobile-app/app.json
+@@ -10,7 +10,9 @@
+     "ios": {
+       "icon": "./assets/expo.icon",
+       "infoPlist": {
+-        "NSLocationWhenInUseUsageDescription": "S.A.F.E. needs your location to send emergency alerts to campus security."
++        "NSLocationWhenInUseUsageDescription": "S.A.F.E. needs your location to send emergency alerts to campus security.",
++        "NSBluetoothAlwaysUsageDescription": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback).",
++        "NSBluetoothPeripheralUsageDescription": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback)."
+       }
+     },
+     "android": {
+@@ -24,7 +26,11 @@
+       "package": "com.safe.kwasu",
+       "permissions": [
+         "ACCESS_FINE_LOCATION",
+-        "ACCESS_COARSE_LOCATION"
++        "ACCESS_COARSE_LOCATION",
++        "BLUETOOTH_SCAN",
++        "BLUETOOTH_ADVERTISE",
++        "BLUETOOTH_CONNECT",
++        "POST_NOTIFICATIONS"
+       ]
+     },
+     "web": {
+@@ -46,6 +52,21 @@
+         {
+           "locationWhenInUsePermission": "S.A.F.E. needs your location to send emergency alerts to campus security."
+         }
++      ],
++      [
++        "expo-notifications",
++        {
++          "icon": "./assets/images/icon.png",
++          "color": "#b91c1c"
++        }
++      ],
++      [
++        "react-native-ble-plx",
++        {
++          "isBackgroundEnabled": false,
++          "modes": ["peripheral", "central"],
++          "bluetoothAlwaysPermission": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback)."
++        }
+       ]
+     ],
+     "experiments": {
+diff --git a/mobile-app/package-lock.json b/mobile-app/package-lock.json
+index 411717d..9700a52 100644
+--- a/mobile-app/package-lock.json
++++ b/mobile-app/package-lock.json
+@@ -11,8 +11,11 @@
+         "@expo/ui": "~57.0.1",
+         "@expo/vector-icons": "^15.0.2",
+         "@react-native-async-storage/async-storage": "2.2.0",
++        "@react-native-community/netinfo": "^12.0.1",
++        "crypto-js": "^4.2.0",
+         "expo": "~57.0.1",
+         "expo-constants": "~57.0.2",
++        "expo-crypto": "^57.0.1",
+         "expo-device": "~57.0.0",
+         "expo-font": "~57.0.0",
+         "expo-glass-effect": "~57.0.0",
+@@ -20,6 +23,7 @@
+         "expo-image-picker": "~57.0.2",
+         "expo-linking": "~57.0.1",
+         "expo-location": "~57.0.2",
++        "expo-notifications": "^57.0.6",
+         "expo-router": "~57.0.2",
+         "expo-splash-screen": "~57.0.1",
+         "expo-status-bar": "~57.0.0",
+@@ -29,16 +33,19 @@
+         "react": "19.2.3",
+         "react-dom": "19.2.3",
+         "react-native": "0.86.0",
++        "react-native-ble-plx": "^3.5.1",
+         "react-native-gesture-handler": "~2.32.0",
+         "react-native-maps": "1.27.2",
+         "react-native-reanimated": "4.5.0",
+         "react-native-safe-area-context": "~5.7.0",
+         "react-native-screens": "4.25.2",
+         "react-native-web": "~0.21.0",
+-        "react-native-worklets": "0.10.0"
++        "react-native-worklets": "0.10.0",
++        "socket.io-client": "^4.8.3"
+       },
+       "devDependencies": {
+         "@expo/ngrok": "^4.1.3",
++        "@types/crypto-js": "^4.2.2",
+         "@types/react": "~19.2.2",
+         "typescript": "~6.0.3"
+       }
+@@ -1311,9 +1318,9 @@
+       }
+     },
+     "node_modules/@expo/env": {
+-      "version": "2.4.0",
+-      "resolved": "https://registry.npmjs.org/@expo/env/-/env-2.4.0.tgz",
+-      "integrity": "sha512-tSlakVnFqdWlXnw5KCFSC1rQU8W5l0Ko8Pb96wi5XU4lCqc0UeLuZCQFpCeAhZGmd91Lo89mCNmr5tnXzZwtFA==",
++      "version": "2.4.2",
++      "resolved": "https://registry.npmjs.org/@expo/env/-/env-2.4.2.tgz",
++      "integrity": "sha512-28pqaEqwnmLduZ00Pq9HkSzE5wbj1MTwp5/n8nm8rD8MCjR9eUnVOwmNksPI3Be2ReAPO/DbPn1puy0mvoocsQ==",
+       "license": "MIT",
+       "dependencies": {
+         "chalk": "^4.0.0",
+@@ -1353,12 +1360,12 @@
+       }
+     },
+     "node_modules/@expo/image-utils": {
+-      "version": "0.11.1",
+-      "resolved": "https://registry.npmjs.org/@expo/image-utils/-/image-utils-0.11.1.tgz",
+-      "integrity": "sha512-0JueH4vdgAZQmhlSYFvTQzt4b4NO5cnByDuApw7bMUIjhwLRnT46Ki3ritMrzJMQaO2lLK2flInZbsZbOuy8nw==",
++      "version": "0.11.3",
++      "resolved": "https://registry.npmjs.org/@expo/image-utils/-/image-utils-0.11.3.tgz",
++      "integrity": "sha512-yMVjkndhXm9mct0uMq+ndxqT6FgAnhucdUfmXuQ6V6uE021GOiYCACO+KZ0MB4vearPSvbWTGfi32QQr2qocfQ==",
+       "license": "MIT",
+       "dependencies": {
+-        "@expo/require-utils": "^57.0.1",
++        "@expo/require-utils": "^57.0.3",
+         "@expo/spawn-async": "^1.8.0",
+         "chalk": "^4.0.0",
+         "getenv": "^2.0.0",
+@@ -1771,9 +1778,9 @@
+       }
+     },
+     "node_modules/@expo/require-utils": {
+-      "version": "57.0.1",
+-      "resolved": "https://registry.npmjs.org/@expo/require-utils/-/require-utils-57.0.1.tgz",
+-      "integrity": "sha512-uXen5/4x7j60I5slShgZr5QEtJDBK8homFiNLDnDrNrxZhrRHXASo0H6JArs3/1PDzw1wahzhGWg2WKuYyZd0A==",
++      "version": "57.0.3",
++      "resolved": "https://registry.npmjs.org/@expo/require-utils/-/require-utils-57.0.3.tgz",
++      "integrity": "sha512-ns05X1K8tM+Qtzp6dNloUFOopSdh3J+HC61BtOR8WHhgtPFyX8TKuO2diqZUqVg9K8yfkWug7g8tBS0qRniSTA==",
+       "license": "MIT",
+       "dependencies": {
+         "@babel/code-frame": "^7.20.0",
+@@ -2392,6 +2399,16 @@
+         "react-native": "^0.0.0-0 || >=0.65 <1.0"
+       }
+     },
++    "node_modules/@react-native-community/netinfo": {
++      "version": "12.0.1",
++      "resolved": "https://registry.npmjs.org/@react-native-community/netinfo/-/netinfo-12.0.1.tgz",
++      "integrity": "sha512-P/3caXIvfYSJG8AWJVefukg+ZGRPs+M4Lp3pNJtgcTYoJxCjWrKQGNnCkj/Cz//zWa/avGed0i/wzm0T8vV2IQ==",
++      "license": "MIT",
++      "peerDependencies": {
++        "react": "*",
++        "react-native": ">=0.59"
++      }
++    },
+     "node_modules/@react-native-masked-view/masked-view": {
+       "version": "0.3.2",
+       "resolved": "https://registry.npmjs.org/@react-native-masked-view/masked-view/-/masked-view-0.3.2.tgz",
+@@ -2670,6 +2687,12 @@
+         "url": "https://github.com/sindresorhus/is?sponsor=1"
+       }
+     },
++    "node_modules/@socket.io/component-emitter": {
++      "version": "3.1.2",
++      "resolved": "https://registry.npmjs.org/@socket.io/component-emitter/-/component-emitter-3.1.2.tgz",
++      "integrity": "sha512-9BCxFwvbGg/RsZK9tjXd8s4UcwR0MWeFQ1XEKIQVVvAGJyINdrqKMcTRyLoK8Rse1GjzLV9cwjWV1olXRWEXVA==",
++      "license": "MIT"
++    },
+     "node_modules/@szmarczak/http-timer": {
+       "version": "4.0.6",
+       "resolved": "https://registry.npmjs.org/@szmarczak/http-timer/-/http-timer-4.0.6.tgz",
+@@ -2796,6 +2819,13 @@
+         "@types/responselike": "^1.0.0"
+       }
+     },
++    "node_modules/@types/crypto-js": {
++      "version": "4.2.2",
++      "resolved": "https://registry.npmjs.org/@types/crypto-js/-/crypto-js-4.2.2.tgz",
++      "integrity": "sha512-sDOLlVbHhXpAUAL0YHDUUwDZf3iN4Bwi4W6a0W0b+QcAezUbRtH4FVb+9J4h+XFPW7l/gQ9F8qC7P+Ec4k8QVQ==",
++      "dev": true,
++      "license": "MIT"
++    },
+     "node_modules/@types/geojson": {
+       "version": "7946.0.16",
+       "resolved": "https://registry.npmjs.org/@types/geojson/-/geojson-7946.0.16.tgz",
+@@ -3206,6 +3236,12 @@
+         }
+       }
+     },
++    "node_modules/badgin": {
++      "version": "1.2.3",
++      "resolved": "https://registry.npmjs.org/badgin/-/badgin-1.2.3.tgz",
++      "integrity": "sha512-NQGA7LcfCpSzIbGRbkgjgdWkjy7HI+Th5VLxTJfW5EeaAf3fnS+xWQaQOCYiny+q6QSvxqoSO04vCx+4u++EJw==",
++      "license": "MIT"
++    },
+     "node_modules/balanced-match": {
+       "version": "4.0.4",
+       "resolved": "https://registry.npmjs.org/balanced-match/-/balanced-match-4.0.4.tgz",
+@@ -3714,6 +3750,12 @@
+         "node": ">= 8"
+       }
+     },
++    "node_modules/crypto-js": {
++      "version": "4.2.0",
++      "resolved": "https://registry.npmjs.org/crypto-js/-/crypto-js-4.2.0.tgz",
++      "integrity": "sha512-KALDyEYgpY+Rlob/iriUtjV6d5Eq+Y191A5g4UqLAi8CyGP9N1+FdVbkc1SxKc2r4YAYqG8JzO2KGL+AizD70Q==",
++      "license": "MIT"
++    },
+     "node_modules/css-in-js-utils": {
+       "version": "3.1.0",
+       "resolved": "https://registry.npmjs.org/css-in-js-utils/-/css-in-js-utils-3.1.0.tgz",
+@@ -3914,6 +3956,49 @@
+         "once": "^1.4.0"
+       }
+     },
++    "node_modules/engine.io-client": {
++      "version": "6.6.6",
++      "resolved": "https://registry.npmjs.org/engine.io-client/-/engine.io-client-6.6.6.tgz",
++      "integrity": "sha512-iY6QdftLQ9pyiPoX082bpf/u1UewnOaJrtJIF9T0++QB34lZrj0uP+Q/bj8AlUsAxqhnkTV2BS8SBZSxOmoV5Q==",
++      "license": "MIT",
++      "dependencies": {
++        "@socket.io/component-emitter": "~3.1.0",
++        "debug": "~4.4.1",
++        "engine.io-parser": "~5.2.1",
++        "ws": "~8.21.0",
++        "xmlhttprequest-ssl": "~2.1.1"
++      }
++    },
++    "node_modules/engine.io-client/node_modules/ws": {
++      "version": "8.21.1",
++      "resolved": "https://registry.npmjs.org/ws/-/ws-8.21.1.tgz",
++      "integrity": "sha512-+0NTnW77fFN/DjQi6k/Sq/Yvk4Sgajw7urW8V+asjXnRgDs9gyGkdb7EzgfhA4goXsRIZKE28fzIXBHEzhuiWw==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.0.0"
++      },
++      "peerDependencies": {
++        "bufferutil": "^4.0.1",
++        "utf-8-validate": ">=5.0.2"
++      },
++      "peerDependenciesMeta": {
++        "bufferutil": {
++          "optional": true
++        },
++        "utf-8-validate": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/engine.io-parser": {
++      "version": "5.2.3",
++      "resolved": "https://registry.npmjs.org/engine.io-parser/-/engine.io-parser-5.2.3.tgz",
++      "integrity": "sha512-HqD3yTBfnBxIrbnM1DoD6Pcq8NECnh8d4As1Qgh0z5Gg3jRRIqijury0CL3ghu/edArpUYiYqQiDUQBIs4np3Q==",
++      "license": "MIT",
++      "engines": {
++        "node": ">=10.0.0"
++      }
++    },
+     "node_modules/error-stack-parser": {
+       "version": "2.1.4",
+       "resolved": "https://registry.npmjs.org/error-stack-parser/-/error-stack-parser-2.1.4.tgz",
+@@ -4039,6 +4124,15 @@
+         }
+       }
+     },
++    "node_modules/expo-application": {
++      "version": "57.0.2",
++      "resolved": "https://registry.npmjs.org/expo-application/-/expo-application-57.0.2.tgz",
++      "integrity": "sha512-q31YwcXyymviAmdrtDfAg3Dld4VMxLCNAfgMHip7vZpPX4lzF/AfwsywqBJUAjQnJknzaNAkzqvMVjO5XmKYDA==",
++      "license": "MIT",
++      "peerDependencies": {
++        "expo": "*"
++      }
++    },
+     "node_modules/expo-asset": {
+       "version": "57.0.2",
+       "resolved": "https://registry.npmjs.org/expo-asset/-/expo-asset-57.0.2.tgz",
+@@ -4055,22 +4149,31 @@
+       }
+     },
+     "node_modules/expo-constants": {
+-      "version": "57.0.2",
+-      "resolved": "https://registry.npmjs.org/expo-constants/-/expo-constants-57.0.2.tgz",
+-      "integrity": "sha512-Bq0lIOB+olAQrYCS/fZi0cu1i8V0lo/YNr9fqMELerOfYYFkg8zTVrVaRjdFdMYBmz3dtym26UEBxV5dyUYZOg==",
++      "version": "57.0.6",
++      "resolved": "https://registry.npmjs.org/expo-constants/-/expo-constants-57.0.6.tgz",
++      "integrity": "sha512-OV+4XUshdO18TKNlo1cxUkXeJWgUOPgalvl8ofmc7kmPPHoyfz2hGJ94tyY/RND/GG5RREE+me9YHClNEzo+Ow==",
+       "license": "MIT",
+       "dependencies": {
+-        "@expo/env": "~2.4.0"
++        "@expo/env": "~2.4.2"
+       },
+       "peerDependencies": {
+         "expo": "*",
+         "react-native": "*"
+       }
+     },
++    "node_modules/expo-crypto": {
++      "version": "57.0.1",
++      "resolved": "https://registry.npmjs.org/expo-crypto/-/expo-crypto-57.0.1.tgz",
++      "integrity": "sha512-xwegXQw3ATgeL1ZuqbSNrGzOeG+zNeh6Z6DSJk825Qpa3TEQQ1kG3ioE1p3g/SNF373BAVz2iBKUTSytlIbBRA==",
++      "license": "MIT",
++      "peerDependencies": {
++        "expo": "*"
++      }
++    },
+     "node_modules/expo-device": {
+-      "version": "57.0.0",
+-      "resolved": "https://registry.npmjs.org/expo-device/-/expo-device-57.0.0.tgz",
+-      "integrity": "sha512-XiTtUhyS64xO8AtEY14FI1vJpUT5b+cyxhjAsHIsoAx6y4rLF719pVY2sNx1MJYb/l7qa9kxWAcMDfk8Q8Gcpg==",
++      "version": "57.0.1",
++      "resolved": "https://registry.npmjs.org/expo-device/-/expo-device-57.0.1.tgz",
++      "integrity": "sha512-jyEMDUticH+dhcL3GHa2aiifOvGXJsmb3oVT2R2q4i8bN7Bddy61+NkpMmuS2VAZrvoLQwf0TJJ/1vi1ukvutA==",
+       "license": "MIT",
+       "dependencies": {
+         "ua-parser-js": "^0.7.33"
+@@ -4236,6 +4339,24 @@
+         "react-native": "*"
+       }
+     },
++    "node_modules/expo-notifications": {
++      "version": "57.0.6",
++      "resolved": "https://registry.npmjs.org/expo-notifications/-/expo-notifications-57.0.6.tgz",
++      "integrity": "sha512-eRzJrcJiaIPTGnI916WZ0NL6vzNDE6WeOdvyDzwSPQrYsoinPZSp0f8hudLrE54crysyAO/rdrOrmJBXsx9w4g==",
++      "license": "MIT",
++      "dependencies": {
++        "@expo/image-utils": "^0.11.3",
++        "abort-controller": "^3.0.0",
++        "badgin": "^1.1.5",
++        "expo-application": "~57.0.2",
++        "expo-constants": "~57.0.6"
++      },
++      "peerDependencies": {
++        "expo": "*",
++        "react": "*",
++        "react-native": "*"
++      }
++    },
+     "node_modules/expo-router": {
+       "version": "57.0.2",
+       "resolved": "https://registry.npmjs.org/expo-router/-/expo-router-57.0.2.tgz",
+@@ -5541,9 +5662,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -5564,9 +5682,6 @@
+       "cpu": [
+         "arm64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -5587,9 +5702,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "glibc"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -5610,9 +5722,6 @@
+       "cpu": [
+         "x64"
+       ],
+-      "libc": [
+-        "musl"
+-      ],
+       "license": "MPL-2.0",
+       "optional": true,
+       "os": [
+@@ -6972,6 +7081,19 @@
+         }
+       }
+     },
++    "node_modules/react-native-ble-plx": {
++      "version": "3.5.1",
++      "resolved": "https://registry.npmjs.org/react-native-ble-plx/-/react-native-ble-plx-3.5.1.tgz",
++      "integrity": "sha512-SxksmrUt9jG6DOarrrdkb5c/HBLSfZOKauo/9VQSSi3WJA4bmF78GkrtXrgSoGNk0m1ksacFTjB5DuL39xZq/g==",
++      "license": "MIT",
++      "engines": {
++        "node": ">= 18.0.0"
++      },
++      "peerDependencies": {
++        "react": "*",
++        "react-native": "*"
++      }
++    },
+     "node_modules/react-native-drawer-layout": {
+       "version": "4.2.5",
+       "resolved": "https://registry.npmjs.org/react-native-drawer-layout/-/react-native-drawer-layout-4.2.5.tgz",
+@@ -7626,6 +7748,34 @@
+         "node": ">=8.0.0"
+       }
+     },
++    "node_modules/socket.io-client": {
++      "version": "4.8.3",
++      "resolved": "https://registry.npmjs.org/socket.io-client/-/socket.io-client-4.8.3.tgz",
++      "integrity": "sha512-uP0bpjWrjQmUt5DTHq9RuoCBdFJF10cdX9X+a368j/Ft0wmaVgxlrjvK3kjvgCODOMMOz9lcaRzxmso0bTWZ/g==",
++      "license": "MIT",
++      "dependencies": {
++        "@socket.io/component-emitter": "~3.1.0",
++        "debug": "~4.4.1",
++        "engine.io-client": "~6.6.1",
++        "socket.io-parser": "~4.2.4"
++      },
++      "engines": {
++        "node": ">=10.0.0"
++      }
++    },
++    "node_modules/socket.io-parser": {
++      "version": "4.2.7",
++      "resolved": "https://registry.npmjs.org/socket.io-parser/-/socket.io-parser-4.2.7.tgz",
++      "integrity": "sha512-IH/iSeO9T6gz1KkFleGDWkG9N3dl4jXVYUtMhIqH10Md0ttMer8nUNWiP1DKuNrybD2xBrixLJdCC9J6ECoYkg==",
++      "license": "MIT",
++      "dependencies": {
++        "@socket.io/component-emitter": "~3.1.0",
++        "debug": "~4.4.1"
++      },
++      "engines": {
++        "node": ">=10.0.0"
++      }
++    },
+     "node_modules/source-map": {
+       "version": "0.5.7",
+       "resolved": "https://registry.npmjs.org/source-map/-/source-map-0.5.7.tgz",
+@@ -8315,6 +8465,14 @@
+         "node": ">=8.0"
+       }
+     },
++    "node_modules/xmlhttprequest-ssl": {
++      "version": "2.1.2",
++      "resolved": "https://registry.npmjs.org/xmlhttprequest-ssl/-/xmlhttprequest-ssl-2.1.2.tgz",
++      "integrity": "sha512-TEU+nJVUUnA4CYJFLvK5X9AOeH4KvDvhIfm0vV1GaQRtchnG0hgK5p8hw/xjv8cunWYCsiPCSDzObPyhEwq3KQ==",
++      "engines": {
++        "node": ">=0.4.0"
++      }
++    },
+     "node_modules/y18n": {
+       "version": "5.0.8",
+       "resolved": "https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz",
+diff --git a/mobile-app/package.json b/mobile-app/package.json
+index 7efa1ad..15186c3 100644
+--- a/mobile-app/package.json
++++ b/mobile-app/package.json
+@@ -6,8 +6,11 @@
+     "@expo/ui": "~57.0.1",
+     "@expo/vector-icons": "^15.0.2",
+     "@react-native-async-storage/async-storage": "2.2.0",
++    "@react-native-community/netinfo": "^12.0.1",
++    "crypto-js": "^4.2.0",
+     "expo": "~57.0.1",
+     "expo-constants": "~57.0.2",
++    "expo-crypto": "^57.0.1",
+     "expo-device": "~57.0.0",
+     "expo-font": "~57.0.0",
+     "expo-glass-effect": "~57.0.0",
+@@ -15,6 +18,7 @@
+     "expo-image-picker": "~57.0.2",
+     "expo-linking": "~57.0.1",
+     "expo-location": "~57.0.2",
++    "expo-notifications": "^57.0.6",
+     "expo-router": "~57.0.2",
+     "expo-splash-screen": "~57.0.1",
+     "expo-status-bar": "~57.0.0",
+@@ -24,16 +28,19 @@
+     "react": "19.2.3",
+     "react-dom": "19.2.3",
+     "react-native": "0.86.0",
++    "react-native-ble-plx": "^3.5.1",
+     "react-native-gesture-handler": "~2.32.0",
+     "react-native-maps": "1.27.2",
+     "react-native-reanimated": "4.5.0",
+     "react-native-safe-area-context": "~5.7.0",
+     "react-native-screens": "4.25.2",
+     "react-native-web": "~0.21.0",
+-    "react-native-worklets": "0.10.0"
++    "react-native-worklets": "0.10.0",
++    "socket.io-client": "^4.8.3"
+   },
+   "devDependencies": {
+     "@expo/ngrok": "^4.1.3",
++    "@types/crypto-js": "^4.2.2",
+     "@types/react": "~19.2.2",
+     "typescript": "~6.0.3"
+   },
+diff --git a/mobile-app/src/app/(app)/_layout.tsx b/mobile-app/src/app/(app)/_layout.tsx
+index 5faa6df..bd2f0c5 100644
+--- a/mobile-app/src/app/(app)/_layout.tsx
++++ b/mobile-app/src/app/(app)/_layout.tsx
+@@ -1,13 +1,28 @@
+-import React from 'react';
+-import { Tabs } from 'expo-router';
++import React, { useEffect } from 'react';
++import { Tabs, useRouter } from 'expo-router';
+ import { Ionicons } from '@expo/vector-icons';
+ import { Platform, View } from 'react-native';
+ import { FloatingChatbot } from '../../components/FloatingChatbot';
+ import { useSafeAreaInsets } from 'react-native-safe-area-context';
++import { addNotificationResponseListener } from '@/services/notifications';
+ 
+ export default function AppLayout() {
+   const insets = useSafeAreaInsets();
+-  
++  const router = useRouter();
++
++  useEffect(() => {
++    // Tapping a push notification (new message, status update, alert
++    // acknowledged/resolved) takes the user straight to the relevant screen.
++    const unsubscribe = addNotificationResponseListener((data) => {
++      if (data.type === 'incident' || data.type === 'message') {
++        if (data.incidentId) router.push(`/(app)/incident/${data.incidentId}`);
++      } else if (data.type === 'alert') {
++        router.push('/(app)/alerts');
++      }
++    });
++    return unsubscribe;
++  }, [router]);
++
+   return (
+     <View style={{ flex: 1 }}>
+       <Tabs
+@@ -82,6 +97,14 @@ export default function AppLayout() {
+             title: 'My Reports',
+           }}
+         />
++        {/* Hidden — two-way chat for a single incident, pushed from the incidents list */}
++        <Tabs.Screen
++          name="incident/[id]"
++          options={{
++            href: null,
++            headerShown: false,
++          }}
++        />
+       </Tabs>
+       <FloatingChatbot />
+     </View>
+diff --git a/mobile-app/src/app/(app)/alerts.tsx b/mobile-app/src/app/(app)/alerts.tsx
+index b6cb336..de34e66 100644
+--- a/mobile-app/src/app/(app)/alerts.tsx
++++ b/mobile-app/src/app/(app)/alerts.tsx
+@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, To
+ import { Ionicons } from '@expo/vector-icons';
+ import { alertsAPI } from '@/services/api';
+ import { useRouter } from 'expo-router';
++import { getQueuedPacketCount, syncQueuedPackets } from '@/services/mesh';
+ 
+ export default function AlertsScreen() {
+   const router = useRouter();
+@@ -10,6 +11,8 @@ export default function AlertsScreen() {
+   const [loading, setLoading] = useState(true);
+   const [refreshing, setRefreshing] = useState(false);
+   const [error, setError] = useState<string | null>(null);
++  const [queuedCount, setQueuedCount] = useState(0);
++  const [syncing, setSyncing] = useState(false);
+ 
+   const fetchAlerts = useCallback(async () => {
+     try {
+@@ -27,16 +30,29 @@ export default function AlertsScreen() {
+     }
+   }, []);
+ 
++  const refreshQueueCount = useCallback(async () => {
++    setQueuedCount(await getQueuedPacketCount());
++  }, []);
++
+   useEffect(() => {
+     fetchAlerts();
+-  }, [fetchAlerts]);
++    refreshQueueCount();
++  }, [fetchAlerts, refreshQueueCount]);
+ 
+   const onRefresh = async () => {
+     setRefreshing(true);
+-    await fetchAlerts();
++    await Promise.all([fetchAlerts(), refreshQueueCount()]);
+     setRefreshing(false);
+   };
+ 
++  const handleSyncNow = async () => {
++    setSyncing(true);
++    const { synced } = await syncQueuedPackets();
++    setSyncing(false);
++    await refreshQueueCount();
++    if (synced > 0) await fetchAlerts();
++  };
++
+   const formatTime = (dateStr: string) => {
+     const d = new Date(dateStr);
+     return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+@@ -77,6 +93,18 @@ export default function AlertsScreen() {
+         </View>
+       )}
+ 
++      {queuedCount > 0 && (
++        <View style={styles.meshBanner}>
++          <Ionicons name="bluetooth" size={20} color="#4338ca" />
++          <Text style={styles.meshBannerText}>
++            {queuedCount} alert{queuedCount > 1 ? 's' : ''} queued offline — waiting to relay/sync.
++          </Text>
++          <TouchableOpacity style={styles.syncButton} onPress={handleSyncNow} disabled={syncing}>
++            {syncing ? <ActivityIndicator size="small" color="#4338ca" /> : <Text style={styles.syncButtonText}>Sync now</Text>}
++          </TouchableOpacity>
++        </View>
++      )}
++
+       {alerts.length === 0 && !error ? (
+         <View style={styles.emptyContainer}>
+           <Ionicons name="notifications-off-outline" size={64} color="#d1d5db" />
+@@ -173,6 +201,38 @@ const styles = StyleSheet.create({
+     fontWeight: '500',
+     flex: 1,
+   },
++  meshBanner: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    backgroundColor: '#eef2ff',
++    borderWidth: 1,
++    borderColor: '#c7d2fe',
++    padding: 14,
++    margin: 20,
++    marginBottom: 0,
++    borderRadius: 12,
++  },
++  meshBannerText: {
++    flex: 1,
++    color: '#4338ca',
++    fontSize: 13,
++    fontWeight: '600',
++    marginLeft: 8,
++    lineHeight: 18,
++  },
++  syncButton: {
++    paddingHorizontal: 12,
++    paddingVertical: 6,
++    backgroundColor: 'white',
++    borderRadius: 8,
++    borderWidth: 1,
++    borderColor: '#4338ca',
++  },
++  syncButtonText: {
++    color: '#4338ca',
++    fontWeight: '700',
++    fontSize: 12,
++  },
+   emptyContainer: {
+     flex: 1,
+     justifyContent: 'center',
+diff --git a/mobile-app/src/app/(app)/incident/[id].tsx b/mobile-app/src/app/(app)/incident/[id].tsx
+new file mode 100644
+index 0000000..34f6a34
+--- /dev/null
++++ b/mobile-app/src/app/(app)/incident/[id].tsx
+@@ -0,0 +1,269 @@
++import React, { useState, useEffect, useCallback, useRef } from 'react';
++import {
++  View,
++  Text,
++  StyleSheet,
++  FlatList,
++  TextInput,
++  TouchableOpacity,
++  ActivityIndicator,
++  KeyboardAvoidingView,
++  Platform,
++} from 'react-native';
++import { Ionicons } from '@expo/vector-icons';
++import { useLocalSearchParams, useRouter } from 'expo-router';
++import { incidentsAPI, messagesAPI } from '@/services/api';
++import { useAuth } from '@/context/AuthContext';
++import { getSocket, joinIncidentRoom, leaveIncidentRoom } from '@/services/socket';
++
++interface ChatMessage {
++  id: number;
++  incident_id: number;
++  sender_id: number;
++  sender_name: string;
++  sender_role: string;
++  content: string;
++  created_at: string;
++}
++
++const STATUS_COLORS: Record<string, string> = {
++  resolved: '#16a34a',
++  investigating: '#f59e0b',
++  received: '#ef4444',
++};
++
++export default function IncidentChatScreen() {
++  const { id } = useLocalSearchParams<{ id: string }>();
++  const router = useRouter();
++  const { user } = useAuth();
++  const incidentId = Number(id);
++
++  const [incident, setIncident] = useState<any>(null);
++  const [messages, setMessages] = useState<ChatMessage[]>([]);
++  const [loading, setLoading] = useState(true);
++  const [input, setInput] = useState('');
++  const [sending, setSending] = useState(false);
++  const [otherTyping, setOtherTyping] = useState(false);
++  const listRef = useRef<FlatList>(null);
++
++  const loadData = useCallback(async () => {
++    const [incRes, msgRes] = await Promise.all([
++      incidentsAPI.getById(incidentId),
++      messagesAPI.getByIncident(incidentId),
++    ]);
++    if (incRes.success && incRes.data) setIncident(incRes.data.incident);
++    if (msgRes.success && msgRes.data) setMessages(msgRes.data.messages || []);
++    setLoading(false);
++  }, [incidentId]);
++
++  useEffect(() => {
++    if (!incidentId) return;
++    loadData();
++
++    joinIncidentRoom(incidentId);
++    const socket = getSocket();
++
++    const onNewMessage = (msg: ChatMessage) => {
++      if (msg.incident_id !== incidentId) return;
++      setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]));
++      setOtherTyping(false);
++    };
++    const onStatusUpdate = (payload: { incidentId: string | number; status: string; assigned_officer?: string }) => {
++      if (Number(payload.incidentId) !== incidentId) return;
++      setIncident((prev: any) => (prev ? { ...prev, status: payload.status, assigned_officer_name: payload.assigned_officer } : prev));
++    };
++    const onTyping = ({ userId }: { userId: number }) => {
++      if (userId !== user?.id) setOtherTyping(true);
++    };
++    const onStopTyping = ({ userId }: { userId: number }) => {
++      if (userId !== user?.id) setOtherTyping(false);
++    };
++
++    socket?.on('new_message', onNewMessage);
++    socket?.on('status_update', onStatusUpdate);
++    socket?.on('user_typing', onTyping);
++    socket?.on('user_stop_typing', onStopTyping);
++
++    return () => {
++      leaveIncidentRoom(incidentId);
++      socket?.off('new_message', onNewMessage);
++      socket?.off('status_update', onStatusUpdate);
++      socket?.off('user_typing', onTyping);
++      socket?.off('user_stop_typing', onStopTyping);
++    };
++  }, [incidentId, loadData, user?.id]);
++
++  const handleSend = async () => {
++    const content = input.trim();
++    if (!content || sending) return;
++    setInput('');
++    setSending(true);
++    const res = await messagesAPI.send(incidentId, content);
++    if (res.success && res.data) {
++      const sentMsg = res.data.message as ChatMessage;
++      setMessages((prev) => (prev.some((m) => m.id === sentMsg.id) ? prev : [...prev, sentMsg]));
++    }
++    setSending(false);
++    getSocket()?.emit('stop_typing', { incidentId, userId: user?.id });
++  };
++
++  const handleTyping = (text: string) => {
++    setInput(text);
++    const socket = getSocket();
++    if (text.length > 0) {
++      socket?.emit('typing', { incidentId, userId: user?.id });
++    } else {
++      socket?.emit('stop_typing', { incidentId, userId: user?.id });
++    }
++  };
++
++  const statusColor = incident?.status ? STATUS_COLORS[incident.status] || '#6b7280' : '#6b7280';
++
++  if (loading) {
++    return (
++      <View style={styles.centerContainer}>
++        <ActivityIndicator size="large" color="#b91c1c" />
++      </View>
++    );
++  }
++
++  return (
++    <KeyboardAvoidingView
++      style={styles.container}
++      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
++      keyboardVerticalOffset={90}
++    >
++      <View style={styles.header}>
++        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
++          <Ionicons name="arrow-back" size={24} color="#1f2937" />
++        </TouchableOpacity>
++        <View style={{ flex: 1 }}>
++          <Text style={styles.title} numberOfLines={1}>{incident?.category || 'Incident'}</Text>
++          <View style={styles.statusRow}>
++            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
++            <Text style={[styles.statusText, { color: statusColor }]}>
++              {incident?.status ? incident.status.charAt(0).toUpperCase() + incident.status.slice(1) : 'Received'}
++            </Text>
++            {incident?.assigned_officer_name && (
++              <Text style={styles.officerText}> · Officer {incident.assigned_officer_name}</Text>
++            )}
++          </View>
++        </View>
++      </View>
++
++      <FlatList
++        ref={listRef}
++        data={messages}
++        keyExtractor={(item) => item.id.toString()}
++        contentContainerStyle={styles.listContent}
++        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
++        ListEmptyComponent={
++          <View style={styles.emptyContainer}>
++            <Ionicons name="shield-checkmark-outline" size={48} color="#d1d5db" />
++            <Text style={styles.emptyText}>
++              This is a secure line to campus security about your report.{'\n'}Send a message if you need to add details or ask about status.
++            </Text>
++          </View>
++        }
++        renderItem={({ item }) => {
++          const isMine = item.sender_id === user?.id;
++          return (
++            <View style={[styles.bubbleRow, isMine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
++              <View style={[styles.bubble, isMine ? styles.bubbleMine : styles.bubbleTheirs]}>
++                {!isMine && <Text style={styles.senderLabel}>{item.sender_name} · {item.sender_role === 'standard_user' ? 'You' : 'Security'}</Text>}
++                <Text style={[styles.bubbleText, isMine && styles.bubbleTextMine]}>{item.content}</Text>
++                <Text style={[styles.bubbleTime, isMine && styles.bubbleTimeMine]}>
++                  {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
++                </Text>
++              </View>
++            </View>
++          );
++        }}
++      />
++
++      {otherTyping && (
++        <Text style={styles.typingIndicator}>Security is typing…</Text>
++      )}
++
++      <View style={styles.inputBar}>
++        <TextInput
++          style={styles.input}
++          placeholder="Message campus security…"
++          placeholderTextColor="#9ca3af"
++          value={input}
++          onChangeText={handleTyping}
++          multiline
++        />
++        <TouchableOpacity
++          style={[styles.sendButton, (!input.trim() || sending) && styles.sendButtonDisabled]}
++          onPress={handleSend}
++          disabled={!input.trim() || sending}
++        >
++          <Ionicons name="send" size={18} color="white" />
++        </TouchableOpacity>
++      </View>
++    </KeyboardAvoidingView>
++  );
++}
++
++const styles = StyleSheet.create({
++  container: { flex: 1, backgroundColor: '#f9fafb' },
++  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
++  header: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    padding: 16,
++    paddingTop: 20,
++    backgroundColor: 'white',
++    borderBottomWidth: 1,
++    borderBottomColor: '#e5e7eb',
++  },
++  backButton: { marginRight: 12, padding: 4 },
++  title: { fontSize: 18, fontWeight: 'bold', color: '#1f2937' },
++  statusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
++  statusDot: { width: 7, height: 7, borderRadius: 4, marginRight: 6 },
++  statusText: { fontSize: 12, fontWeight: '700' },
++  officerText: { fontSize: 12, color: '#6b7280' },
++  listContent: { padding: 16, paddingBottom: 8, flexGrow: 1 },
++  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 30 },
++  emptyText: { textAlign: 'center', color: '#9ca3af', marginTop: 12, lineHeight: 20 },
++  bubbleRow: { marginBottom: 10, flexDirection: 'row' },
++  bubbleRowMine: { justifyContent: 'flex-end' },
++  bubbleRowTheirs: { justifyContent: 'flex-start' },
++  bubble: { maxWidth: '78%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 10 },
++  bubbleMine: { backgroundColor: '#b91c1c', borderBottomRightRadius: 4 },
++  bubbleTheirs: { backgroundColor: 'white', borderBottomLeftRadius: 4, borderWidth: 1, borderColor: '#e5e7eb' },
++  senderLabel: { fontSize: 11, fontWeight: '700', color: '#4f46e5', marginBottom: 3 },
++  bubbleText: { fontSize: 15, color: '#1f2937', lineHeight: 20 },
++  bubbleTextMine: { color: 'white' },
++  bubbleTime: { fontSize: 10, color: '#9ca3af', marginTop: 4, alignSelf: 'flex-end' },
++  bubbleTimeMine: { color: '#fecaca' },
++  typingIndicator: { paddingHorizontal: 20, paddingBottom: 4, fontSize: 12, color: '#9ca3af', fontStyle: 'italic' },
++  inputBar: {
++    flexDirection: 'row',
++    alignItems: 'flex-end',
++    padding: 12,
++    backgroundColor: 'white',
++    borderTopWidth: 1,
++    borderTopColor: '#e5e7eb',
++  },
++  input: {
++    flex: 1,
++    backgroundColor: '#f3f4f6',
++    borderRadius: 20,
++    paddingHorizontal: 16,
++    paddingVertical: 10,
++    fontSize: 15,
++    maxHeight: 100,
++    marginRight: 8,
++  },
++  sendButton: {
++    backgroundColor: '#b91c1c',
++    width: 40,
++    height: 40,
++    borderRadius: 20,
++    justifyContent: 'center',
++    alignItems: 'center',
++  },
++  sendButtonDisabled: { backgroundColor: '#d1d5db' },
++});
+diff --git a/mobile-app/src/app/(app)/incidents.tsx b/mobile-app/src/app/(app)/incidents.tsx
+index e125a6f..515ae7c 100644
+--- a/mobile-app/src/app/(app)/incidents.tsx
++++ b/mobile-app/src/app/(app)/incidents.tsx
+@@ -95,7 +95,11 @@ export default function IncidentsScreen() {
+           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#b91c1c" />}
+           contentContainerStyle={styles.listContainer}
+           renderItem={({ item }) => (
+-            <TouchableOpacity style={styles.card}>
++            <TouchableOpacity
++              style={styles.card}
++              activeOpacity={0.7}
++              onPress={() => router.push(`/(app)/incident/${item.id}`)}
++            >
+               <View style={styles.cardHeader}>
+                 <View style={styles.badgeContainer}>
+                   <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]} />
+@@ -118,6 +122,12 @@ export default function IncidentsScreen() {
+                     </Text>
+                   </View>
+                 )}
++
++                <View style={styles.messageRow}>
++                  <Ionicons name="chatbubble-ellipses-outline" size={16} color="#6b7280" />
++                  <Text style={styles.messageRowText}>Message security about this report</Text>
++                  <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
++                </View>
+               </View>
+             </TouchableOpacity>
+           )}
+@@ -283,4 +293,18 @@ const styles = StyleSheet.create({
+     fontWeight: '600',
+     marginLeft: 6,
+   },
++  messageRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginTop: 10,
++    paddingTop: 10,
++    borderTopWidth: 1,
++    borderTopColor: '#f3f4f6',
++  },
++  messageRowText: {
++    flex: 1,
++    fontSize: 13,
++    color: '#6b7280',
++    marginLeft: 6,
++  },
+ });
+diff --git a/mobile-app/src/app/(app)/index.tsx b/mobile-app/src/app/(app)/index.tsx
+index 381fe9d..e2db657 100644
+--- a/mobile-app/src/app/(app)/index.tsx
++++ b/mobile-app/src/app/(app)/index.tsx
+@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, FlatList, Re
+ import { Ionicons } from '@expo/vector-icons';
+ import * as Location from 'expo-location';
+ import { alertsAPI, incidentsAPI } from '@/services/api';
++import { sendAlertWithFallback } from '@/services/mesh';
+ import { useAuth } from '@/context/AuthContext';
+ import { useRouter } from 'expo-router';
+ 
+@@ -63,23 +64,23 @@ export default function HomeScreen() {
+       if (!loc) {
+         loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+       }
++      const latitude = loc?.coords.latitude || 8.6762;
++      const longitude = loc?.coords.longitude || 4.1680;
+ 
+-      const result = await alertsAPI.trigger(
+-        loc?.coords.latitude || 8.6762,
+-        loc?.coords.longitude || 4.1680,
+-        'https'
+-      );
++      const delivery = await sendAlertWithFallback(user?.id ?? 0, latitude, longitude);
+ 
+-      if (result.success) {
++      if (delivery.mode === 'https') {
+         Alert.alert('🚨 SOS Triggered!', 'Campus security has been notified of your location.');
+-        setSosState('sent');
+-        fetchData(); // Refresh recent alerts
+       } else {
+-        Alert.alert('SOS Sent (Offline)', 'SMS fallback will deliver your alert.');
+-        setSosState('sent');
++        Alert.alert(
++          '🚨 SOS Queued (Offline)',
++          'No connection detected. Your alert is encrypted and queued — it will relay to nearby S.A.F.E. devices and auto-sync the moment any device reaches the internet. An SMS fallback will also fire if unacknowledged.'
++        );
+       }
++      setSosState('sent');
++      fetchData(); // Refresh recent alerts
+     } catch (err) {
+-      Alert.alert('SOS Sent (Offline)', 'SMS fallback will deliver your alert.');
++      Alert.alert('SOS Sent (Offline)', 'Your alert is queued and will deliver via mesh relay or SMS fallback.');
+       setSosState('sent');
+     }
+ 
+@@ -105,21 +106,20 @@ export default function HomeScreen() {
+               let loc = await Location.getLastKnownPositionAsync({});
+               if (!loc) loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+ 
+-              // We use alertsAPI.trigger for the SOS — the category is metadata
+-              const result = await alertsAPI.trigger(
++              const delivery = await sendAlertWithFallback(
++                user?.id ?? 0,
+                 loc?.coords.latitude || 8.6762,
+-                loc?.coords.longitude || 4.1680,
+-                'https'
++                loc?.coords.longitude || 4.1680
+               );
+ 
+-              if (result.success) {
++              if (delivery.mode === 'https') {
+                 Alert.alert('✅ Alert Sent', `${category} emergency alert sent to campus security.`);
+-                fetchData();
+               } else {
+-                Alert.alert('Alert Queued', 'Your alert will be delivered via SMS fallback.');
++                Alert.alert('Alert Queued', 'No connection detected — your alert is encrypted and queued for mesh relay / SMS fallback.');
+               }
++              fetchData();
+             } catch {
+-              Alert.alert('Alert Queued', 'Your alert will be delivered via SMS fallback.');
++              Alert.alert('Alert Queued', 'Your alert is encrypted and queued for mesh relay / SMS fallback.');
+             }
+           },
+         },
+diff --git a/mobile-app/src/app/(app)/report.tsx b/mobile-app/src/app/(app)/report.tsx
+index d43432c..37d9560 100644
+--- a/mobile-app/src/app/(app)/report.tsx
++++ b/mobile-app/src/app/(app)/report.tsx
+@@ -3,7 +3,13 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
+ import { Ionicons } from '@expo/vector-icons';
+ import * as Location from 'expo-location';
+ import * as ImagePicker from 'expo-image-picker';
+-import { api } from '@/services/api';
++import { incidentsAPI } from '@/services/api';
++
++interface AIClassification {
++  ai_category_suggestion: string;
++  ai_severity_score: number;
++  ai_is_suspicious: boolean;
++}
+ 
+ export default function ReportScreen() {
+   const [description, setDescription] = useState('');
+@@ -11,7 +17,11 @@ export default function ReportScreen() {
+   const [loading, setLoading] = useState(false);
+   const [mediaUri, setMediaUri] = useState<string | null>(null);
+ 
+-  const types = ['Theft', 'Harassment', 'Fire', 'Medical', 'Other'];
++  const [analyzing, setAnalyzing] = useState(false);
++  const [aiResult, setAiResult] = useState<AIClassification | null>(null);
++  const [aiAccepted, setAiAccepted] = useState(false);
++
++  const types = ['Theft', 'Harassment', 'Fire', 'Medical', 'Assault', 'General', 'Other'];
+ 
+   const pickImage = async () => {
+     const result = await ImagePicker.launchImageLibraryAsync({
+@@ -25,12 +35,46 @@ export default function ReportScreen() {
+     }
+   };
+ 
++  const handleAnalyze = async () => {
++    if (description.trim().length < 5) {
++      Alert.alert('Add more detail', 'Please describe what is happening (at least a few words) before analyzing.');
++      return;
++    }
++    setAnalyzing(true);
++    setAiResult(null);
++    setAiAccepted(false);
++    try {
++      const res = await incidentsAPI.classify(description);
++      if (res.success && res.data) {
++        setAiResult(res.data.ai_classification);
++      } else {
++        Alert.alert('Analysis unavailable', res.error || 'Could not analyze right now — you can still pick a category manually and submit.');
++      }
++    } catch {
++      Alert.alert('Analysis unavailable', 'Could not reach the AI service — you can still pick a category manually and submit.');
++    } finally {
++      setAnalyzing(false);
++    }
++  };
++
++  const acceptAiSuggestion = () => {
++    if (!aiResult) return;
++    setIncidentType(aiResult.ai_category_suggestion);
++    setAiAccepted(true);
++  };
++
++  const severityColor = (score: number) => {
++    if (score >= 80) return '#dc2626';
++    if (score >= 50) return '#f59e0b';
++    return '#16a34a';
++  };
++
+   const handleSubmit = async () => {
+     if (!incidentType || !description) {
+       Alert.alert('Missing Info', 'Please select an incident type and provide a description.');
+       return;
+     }
+-    
++
+     setLoading(true);
+     try {
+       let { status } = await Location.requestForegroundPermissionsAsync();
+@@ -38,26 +82,31 @@ export default function ReportScreen() {
+         Alert.alert('Permission Denied', 'Location permission is required to submit a report.');
+         return;
+       }
+-      
++
+       const loc = await Location.getCurrentPositionAsync({});
+-      
+-      const result = await api.post('/api/incidents', {
++
++      const result = await incidentsAPI.create({
+         category: incidentType,
+         description,
+         latitude: loc.coords.latitude,
+-        longitude: loc.coords.longitude
++        longitude: loc.coords.longitude,
+       });
+ 
+-      if (result.success) {
++      if (result.success && result.data) {
+         Alert.alert(
+-          'Report Submitted', 
+-          'Your report has been sent to campus security successfully. AI Classification: ' + result.data.ai_classification.ai_severity_score + '% severity.',
++          'Report Submitted',
++          `Your report has been sent to campus security successfully. AI Classification: ${result.data.ai_classification.ai_severity_score}% severity.`,
+           [
+-            { text: 'OK', onPress: () => {
+-              setDescription('');
+-              setIncidentType('');
+-              setMediaUri(null);
+-            }}
++            {
++              text: 'OK',
++              onPress: () => {
++                setDescription('');
++                setIncidentType('');
++                setMediaUri(null);
++                setAiResult(null);
++                setAiAccepted(false);
++              },
++            },
+           ]
+         );
+       } else {
+@@ -77,19 +126,6 @@ export default function ReportScreen() {
+         <Text style={styles.subtitle}>Provide details to help security respond effectively. This is strictly confidential.</Text>
+       </View>
+ 
+-      <Text style={styles.label}>Type of Incident</Text>
+-      <View style={styles.typeContainer}>
+-        {types.map((type) => (
+-          <TouchableOpacity 
+-            key={type} 
+-            style={[styles.typeChip, incidentType === type && styles.typeChipActive]}
+-            onPress={() => setIncidentType(type)}
+-          >
+-            <Text style={[styles.typeText, incidentType === type && styles.typeTextActive]}>{type}</Text>
+-          </TouchableOpacity>
+-        ))}
+-      </View>
+-
+       <Text style={styles.label}>Location</Text>
+       <View style={styles.locationBox}>
+         <Ionicons name="location" size={20} color="#b91c1c" />
+@@ -105,9 +141,83 @@ export default function ReportScreen() {
+         numberOfLines={6}
+         textAlignVertical="top"
+         value={description}
+-        onChangeText={setDescription}
++        onChangeText={(text) => {
++          setDescription(text);
++          if (aiResult) {
++            setAiResult(null);
++            setAiAccepted(false);
++          }
++        }}
+       />
+ 
++      <TouchableOpacity style={styles.analyzeButton} onPress={handleAnalyze} disabled={analyzing}>
++        {analyzing ? (
++          <ActivityIndicator color="#4338ca" />
++        ) : (
++          <>
++            <Ionicons name="hardware-chip" size={20} color="#4338ca" />
++            <Text style={styles.analyzeText}>Analyze with AI</Text>
++          </>
++        )}
++      </TouchableOpacity>
++
++      {aiResult && (
++        <View style={styles.aiCard}>
++          <View style={styles.aiCardHeader}>
++            <Ionicons name="sparkles" size={18} color="#4338ca" />
++            <Text style={styles.aiCardTitle}>AI Suggestion</Text>
++          </View>
++          <Text style={styles.aiCardCategory}>
++            Category: <Text style={{ fontWeight: 'bold' }}>{aiResult.ai_category_suggestion}</Text>
++          </Text>
++          <View style={styles.severityRow}>
++            <Text style={styles.severityLabel}>Severity</Text>
++            <View style={styles.severityBarTrack}>
++              <View
++                style={[
++                  styles.severityBarFill,
++                  { width: `${aiResult.ai_severity_score}%`, backgroundColor: severityColor(aiResult.ai_severity_score) },
++                ]}
++              />
++            </View>
++            <Text style={[styles.severityValue, { color: severityColor(aiResult.ai_severity_score) }]}>
++              {aiResult.ai_severity_score}%
++            </Text>
++          </View>
++          {aiResult.ai_is_suspicious && (
++            <Text style={styles.suspiciousFlag}>⚠ Flagged as potentially suspicious for review</Text>
++          )}
++          <Text style={styles.aiCardHint}>
++            You can accept this category or choose your own below — either way you decide what gets submitted.
++          </Text>
++          <TouchableOpacity
++            style={[styles.acceptButton, aiAccepted && styles.acceptButtonActive]}
++            onPress={acceptAiSuggestion}
++          >
++            <Ionicons name={aiAccepted ? 'checkmark-circle' : 'checkmark-circle-outline'} size={18} color={aiAccepted ? 'white' : '#4338ca'} />
++            <Text style={[styles.acceptButtonText, aiAccepted && styles.acceptButtonTextActive]}>
++              {aiAccepted ? 'Using AI suggestion' : 'Use this category'}
++            </Text>
++          </TouchableOpacity>
++        </View>
++      )}
++
++      <Text style={styles.label}>Type of Incident</Text>
++      <View style={styles.typeContainer}>
++        {types.map((type) => (
++          <TouchableOpacity
++            key={type}
++            style={[styles.typeChip, incidentType === type && styles.typeChipActive]}
++            onPress={() => {
++              setIncidentType(type);
++              setAiAccepted(false);
++            }}
++          >
++            <Text style={[styles.typeText, incidentType === type && styles.typeTextActive]}>{type}</Text>
++          </TouchableOpacity>
++        ))}
++      </View>
++
+       <TouchableOpacity style={styles.cameraButton} onPress={pickImage}>
+         <Ionicons name="camera" size={24} color="#4b5563" />
+         <Text style={styles.cameraText}>
+@@ -115,8 +225,8 @@ export default function ReportScreen() {
+         </Text>
+       </TouchableOpacity>
+ 
+-      <TouchableOpacity 
+-        style={[styles.submitButton, loading && styles.submitButtonDisabled]} 
++      <TouchableOpacity
++        style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+         onPress={handleSubmit}
+         disabled={loading}
+       >
+@@ -207,8 +317,109 @@ const styles = StyleSheet.create({
+     padding: 16,
+     fontSize: 16,
+     color: '#1f2937',
++    marginBottom: 12,
++  },
++  analyzeButton: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    backgroundColor: '#eef2ff',
++    borderWidth: 1,
++    borderColor: '#c7d2fe',
++    borderRadius: 12,
++    paddingVertical: 14,
++    marginBottom: 16,
++  },
++  analyzeText: {
++    color: '#4338ca',
++    fontWeight: '700',
++    fontSize: 15,
++    marginLeft: 8,
++  },
++  aiCard: {
++    backgroundColor: 'white',
++    borderWidth: 1,
++    borderColor: '#e0e7ff',
++    borderRadius: 12,
++    padding: 16,
+     marginBottom: 20,
+   },
++  aiCardHeader: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginBottom: 10,
++  },
++  aiCardTitle: {
++    fontWeight: 'bold',
++    color: '#4338ca',
++    marginLeft: 6,
++    fontSize: 15,
++  },
++  aiCardCategory: {
++    fontSize: 15,
++    color: '#374151',
++    marginBottom: 12,
++  },
++  severityRow: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    marginBottom: 8,
++  },
++  severityLabel: {
++    fontSize: 13,
++    color: '#6b7280',
++    width: 60,
++  },
++  severityBarTrack: {
++    flex: 1,
++    height: 8,
++    backgroundColor: '#f3f4f6',
++    borderRadius: 4,
++    marginHorizontal: 8,
++    overflow: 'hidden',
++  },
++  severityBarFill: {
++    height: '100%',
++    borderRadius: 4,
++  },
++  severityValue: {
++    fontSize: 13,
++    fontWeight: 'bold',
++    width: 40,
++    textAlign: 'right',
++  },
++  suspiciousFlag: {
++    color: '#b45309',
++    fontSize: 13,
++    fontWeight: '600',
++    marginBottom: 8,
++  },
++  aiCardHint: {
++    fontSize: 12,
++    color: '#9ca3af',
++    marginBottom: 12,
++    lineHeight: 17,
++  },
++  acceptButton: {
++    flexDirection: 'row',
++    alignItems: 'center',
++    justifyContent: 'center',
++    borderWidth: 1,
++    borderColor: '#4338ca',
++    borderRadius: 10,
++    paddingVertical: 10,
++  },
++  acceptButtonActive: {
++    backgroundColor: '#4338ca',
++  },
++  acceptButtonText: {
++    color: '#4338ca',
++    fontWeight: '700',
++    marginLeft: 6,
++  },
++  acceptButtonTextActive: {
++    color: 'white',
++  },
+   cameraButton: {
+     flexDirection: 'row',
+     alignItems: 'center',
+diff --git a/mobile-app/src/components/FloatingChatbot.tsx b/mobile-app/src/components/FloatingChatbot.tsx
+index 13c84c5..5e87d30 100644
+--- a/mobile-app/src/components/FloatingChatbot.tsx
++++ b/mobile-app/src/components/FloatingChatbot.tsx
+@@ -50,7 +50,8 @@ export function FloatingChatbot() {
+     try {
+       const res = await aiAPI.chat(userMsg.text);
+       if (res.success && res.data) {
+-        setMessages(prev => [...prev, { id: Date.now().toString() + 'ai', text: res.data.reply, sender: 'ai' }]);
++        const { reply } = res.data;
++        setMessages(prev => [...prev, { id: Date.now().toString() + 'ai', text: reply, sender: 'ai' }]);
+       } else {
+         setMessages(prev => [...prev, { id: Date.now().toString() + 'err', text: res.error || "Sorry, I'm having trouble connecting right now.", sender: 'ai' }]);
+       }
+diff --git a/mobile-app/src/context/AuthContext.tsx b/mobile-app/src/context/AuthContext.tsx
+index 635bf75..e4185b8 100644
+--- a/mobile-app/src/context/AuthContext.tsx
++++ b/mobile-app/src/context/AuthContext.tsx
+@@ -1,6 +1,9 @@
+ import React, { createContext, useContext, useState, useEffect } from 'react';
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ import { api } from '../services/api';
++import { connectSocket, disconnectSocket } from '../services/socket';
++import { startMeshAutoSync, syncQueuedPackets } from '../services/mesh';
++import { registerForPushNotifications } from '../services/notifications';
+ 
+ interface User {
+   id: number;
+@@ -26,6 +29,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+   const [user, setUser] = useState<User | null>(null);
+   const [isLoading, setIsLoading] = useState(true);
+ 
++  // Bring up the real-time layer once we know we have a valid session:
++  // live socket connection, mesh auto-sync-on-reconnect, and any offline
++  // SOS alerts that queued up while this device was signed out but still
++  // held onto a pending packet.
++  const activateSession = async () => {
++    startMeshAutoSync();
++    syncQueuedPackets().catch(() => {});
++    connectSocket().catch(() => {});
++    registerForPushNotifications().catch(() => {});
++  };
++
+   useEffect(() => {
+     // Load token from storage on startup
+     const loadToken = async () => {
+@@ -37,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+           const result = await api.get('/api/auth/profile');
+           if (result && result.success && result.data && result.data.user) {
+             setUser(result.data.user);
++            activateSession();
+           } else {
+              // Invalid token fallback
+              await AsyncStorage.removeItem('safe_token');
+@@ -59,6 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+       const result = await api.get('/api/auth/profile');
+       if (result && result.success && result.data && result.data.user) {
+         setUser(result.data.user);
++        activateSession();
+       }
+     } catch (e) {
+       console.error('Failed to save token or fetch profile', e);
+@@ -67,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
+ 
+   const logout = async () => {
+     try {
++      disconnectSocket();
+       await AsyncStorage.removeItem('safe_token');
+       setToken(null);
+       setUser(null);
+diff --git a/mobile-app/src/services/api.ts b/mobile-app/src/services/api.ts
+index 4afa8bf..31c4490 100644
+--- a/mobile-app/src/services/api.ts
++++ b/mobile-app/src/services/api.ts
+@@ -1,8 +1,8 @@
+ import AsyncStorage from '@react-native-async-storage/async-storage';
+ 
+-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.31.26.202:5000';
++export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.31.26.202:5000';
+ 
+-const getToken = async () => {
++export const getToken = async () => {
+   try {
+     return await AsyncStorage.getItem('safe_token');
+   } catch (e) {
+@@ -68,7 +68,7 @@ export const authAPI = {
+ 
+   getProfile: async () => apiRequest<{ user: any }>('/api/auth/profile'),
+ 
+-  updateProfile: async (data: { full_name?: string; phone?: string }) =>
++  updateProfile: async (data: { full_name?: string; phone?: string; push_token?: string }) =>
+     apiRequest<{ user: any }>('/api/auth/profile', {
+       method: 'PUT',
+       body: JSON.stringify(data),
+@@ -139,6 +139,20 @@ export const incidentsAPI = {
+ 
+   getStats: async (period?: number) =>
+     apiRequest<any>(`/api/incidents/stats?period=${period || 7}`),
++
++  // Preview the AI's suggested category/severity before final submission,
++  // so the user can confirm or override it.
++  classify: async (description: string) =>
++    apiRequest<{
++      ai_classification: {
++        ai_category_suggestion: string;
++        ai_severity_score: number;
++        ai_is_suspicious: boolean;
++      };
++    }>('/api/incidents/classify', {
++      method: 'POST',
++      body: JSON.stringify({ description }),
++    }),
+ };
+ 
+ // ─── Messages ────────────────────────────────────────────────
+@@ -156,6 +170,21 @@ export const messagesAPI = {
+     apiRequest(`/api/messages/${id}/read`, { method: 'PATCH' }),
+ };
+ 
++// ─── Mesh (offline relay sync) ──────────────────────────────
++export const meshAPI = {
++  sync: async (payload: {
++    encrypted_payload: string;
++    ttl: number;
++    origin_device_id: string;
++    relay_device_id?: string;
++    hop_count?: number;
++  }) =>
++    apiRequest<{ alert: any; mesh_packet: any }>('/api/mesh/sync', {
++      method: 'POST',
++      body: JSON.stringify(payload),
++    }),
++};
++
+ // ─── Analytics ───────────────────────────────────────────────
+ export const analyticsAPI = {
+   getDashboard: async () => apiRequest<any>('/api/analytics/dashboard'),
+diff --git a/mobile-app/src/services/mesh.ts b/mobile-app/src/services/mesh.ts
+new file mode 100644
+index 0000000..fe034e3
+--- /dev/null
++++ b/mobile-app/src/services/mesh.ts
+@@ -0,0 +1,257 @@
++import AsyncStorage from '@react-native-async-storage/async-storage';
++import * as Crypto from 'expo-crypto';
++import NetInfo from '@react-native-community/netinfo';
++import CryptoJS from 'crypto-js';
++import { meshAPI, alertsAPI } from './api';
++
++// Must match the backend's MESH_ENCRYPTION_KEY default (Back End/backend/controllers/meshController.js).
++// If the backend operator sets a custom MESH_ENCRYPTION_KEY env var, update this to match.
++const MESH_ENCRYPTION_KEY = 'SAFE_MESH_KEY_32_CHARACTERS_LONG';
++const QUEUE_KEY = 'safe_mesh_queue';
++const DEVICE_ID_KEY = 'safe_device_id';
++const DEFAULT_TTL = 5; // max relay hops before a packet is dropped
++
++export interface MeshAlertPayload {
++  user_id: number;
++  latitude: number;
++  longitude: number;
++  timestamp: string;
++}
++
++export interface QueuedPacket {
++  id: string;
++  encrypted_payload: string;
++  ttl: number;
++  origin_device_id: string;
++  hop_count: number;
++  queued_at: string;
++}
++
++// ─── Device identity ─────────────────────────────────────────
++export async function getDeviceId(): Promise<string> {
++  let id = await AsyncStorage.getItem(DEVICE_ID_KEY);
++  if (!id) {
++    id = Crypto.randomUUID();
++    await AsyncStorage.setItem(DEVICE_ID_KEY, id);
++  }
++  return id;
++}
++
++// ─── AES-256-CBC encryption (matches backend zero-IV scheme) ──
++function getKeyWordArray() {
++  const padded = MESH_ENCRYPTION_KEY.padEnd(32, '0').slice(0, 32);
++  return CryptoJS.enc.Utf8.parse(padded);
++}
++
++const ZERO_IV = CryptoJS.lib.WordArray.create([0, 0, 0, 0]); // 16 zero bytes
++
++function encryptPayload(payload: MeshAlertPayload): string {
++  const json = JSON.stringify(payload);
++  const encrypted = CryptoJS.AES.encrypt(json, getKeyWordArray(), {
++    iv: ZERO_IV,
++    mode: CryptoJS.mode.CBC,
++    padding: CryptoJS.pad.Pkcs7,
++  });
++  return encrypted.ciphertext.toString(CryptoJS.enc.Hex);
++}
++
++// ─── Local queue (AsyncStorage) ────────────────────────────────
++async function readQueue(): Promise<QueuedPacket[]> {
++  try {
++    const raw = await AsyncStorage.getItem(QUEUE_KEY);
++    return raw ? JSON.parse(raw) : [];
++  } catch {
++    return [];
++  }
++}
++
++async function writeQueue(queue: QueuedPacket[]) {
++  await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
++}
++
++export async function getQueuedPacketCount(): Promise<number> {
++  return (await readQueue()).length;
++}
++
++/**
++ * Called when HTTPS delivery of an SOS alert fails or times out.
++ * Encrypts the alert, queues it locally, tries a best-effort BLE relay
++ * to nearby devices, and leaves it queued for automatic sync the moment
++ * connectivity returns (see startMeshAutoSync).
++ */
++export async function queueAlertForMesh(
++  userId: number,
++  latitude: number,
++  longitude: number
++): Promise<QueuedPacket> {
++  const deviceId = await getDeviceId();
++  const payload: MeshAlertPayload = {
++    user_id: userId,
++    latitude,
++    longitude,
++    timestamp: new Date().toISOString(),
++  };
++
++  const packet: QueuedPacket = {
++    id: Crypto.randomUUID(),
++    encrypted_payload: encryptPayload(payload),
++    ttl: DEFAULT_TTL,
++    origin_device_id: deviceId,
++    hop_count: 0,
++    queued_at: new Date().toISOString(),
++  };
++
++  const queue = await readQueue();
++  queue.push(packet);
++  await writeQueue(queue);
++
++  // Best-effort: try to hand this packet to any nearby S.A.F.E. device over
++  // BLE so it can relay it if it has connectivity before we do.
++  relayViaBLE(packet).catch(() => {});
++
++  return packet;
++}
++
++/**
++ * Attempt to push every queued packet to the server. Called automatically
++ * when the network comes back, and can also be called manually (e.g. a
++ * "Sync now" button, or after receiving a relayed packet from a peer).
++ */
++export async function syncQueuedPackets(): Promise<{ synced: number; remaining: number }> {
++  const queue = await readQueue();
++  if (queue.length === 0) return { synced: 0, remaining: 0 };
++
++  const deviceId = await getDeviceId();
++  const stillQueued: QueuedPacket[] = [];
++  let synced = 0;
++
++  for (const packet of queue) {
++    const result = await meshAPI.sync({
++      encrypted_payload: packet.encrypted_payload,
++      ttl: packet.ttl,
++      origin_device_id: packet.origin_device_id,
++      relay_device_id: packet.origin_device_id === deviceId ? undefined : deviceId,
++      hop_count: packet.hop_count,
++    });
++
++    if (result.success) {
++      synced += 1;
++    } else {
++      stillQueued.push(packet);
++    }
++  }
++
++  await writeQueue(stillQueued);
++  return { synced, remaining: stillQueued.length };
++}
++
++export type AlertDeliveryMode = 'https' | 'mesh';
++
++/**
++ * The core FR4 flow: try to deliver an SOS alert over HTTPS first; if that
++ * fails or takes too long (no signal / server unreachable), fall back to
++ * the encrypted mesh queue so the alert is never silently lost. Returns
++ * which path actually delivered it.
++ */
++export async function sendAlertWithFallback(
++  userId: number,
++  latitude: number,
++  longitude: number,
++  timeoutMs = 7000
++): Promise<{ mode: AlertDeliveryMode; success: boolean }> {
++  const httpsAttempt = alertsAPI.trigger(latitude, longitude, 'https');
++  const timeout = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), timeoutMs));
++
++  const race = await Promise.race([httpsAttempt, timeout]);
++
++  if (race !== 'timeout' && race.success) {
++    return { mode: 'https', success: true };
++  }
++
++  // Either the request failed outright or it's taking too long (likely no
++  // connectivity) — queue it for mesh relay / auto-sync instead of blocking
++  // the user waiting on a request that may never return.
++  await queueAlertForMesh(userId, latitude, longitude);
++  return { mode: 'mesh', success: true };
++}
++
++let autoSyncUnsubscribe: (() => void) | null = null;
++
++/**
++ * Start listening for connectivity changes and auto-sync the mesh queue
++ * the moment the device is back online. Call once (e.g. from AuthContext).
++ */
++export function startMeshAutoSync() {
++  if (autoSyncUnsubscribe) return;
++  autoSyncUnsubscribe = NetInfo.addEventListener((state) => {
++    if (state.isConnected && state.isInternetReachable !== false) {
++      syncQueuedPackets().catch(() => {});
++    }
++  });
++}
++
++export function stopMeshAutoSync() {
++  autoSyncUnsubscribe?.();
++  autoSyncUnsubscribe = null;
++}
++
++// ─── Best-effort BLE relay ──────────────────────────────────────
++// True peer-to-peer BLE mesh needs native modules on both the scanning
++// (central) and advertising (peripheral) side. react-native-ble-plx gives
++// us central-mode scanning; advertising as a discoverable peripheral needs
++// an additional native module per platform. This function is written so it
++// degrades to a silent no-op wherever that native support isn't present
++// (e.g. Expo Go) — the packet stays safely queued and still gets delivered
++// via syncQueuedPackets() as soon as any relaying device reaches the internet.
++const SAFE_MESH_SERVICE_UUID = '0000safe-0000-1000-8000-00805f9b34fb';
++
++async function relayViaBLE(packet: QueuedPacket): Promise<void> {
++  try {
++    // Lazy require so bundling/running without the native module linked
++    // (e.g. in Expo Go) never crashes the JS bundle.
++    // eslint-disable-next-line @typescript-eslint/no-var-requires
++    const { BleManager } = require('react-native-ble-plx');
++    const manager = new BleManager();
++    const state = await manager.state();
++    if (state !== 'PoweredOn') {
++      manager.destroy();
++      return;
++    }
++
++    await new Promise<void>((resolve) => {
++      const timeout = setTimeout(() => {
++        manager.stopDeviceScan();
++        manager.destroy();
++        resolve();
++      }, 8000);
++
++      manager.startDeviceScan([SAFE_MESH_SERVICE_UUID], null, async (error: any, device: any) => {
++        if (error || !device) return;
++        try {
++          manager.stopDeviceScan();
++          clearTimeout(timeout);
++          const connected = await device.connect();
++          await connected.discoverAllServicesAndCharacteristics();
++          const payloadBase64 = CryptoJS.enc.Base64.stringify(
++            CryptoJS.enc.Utf8.parse(JSON.stringify(packet))
++          );
++          await connected.writeCharacteristicWithResponseForService(
++            SAFE_MESH_SERVICE_UUID,
++            SAFE_MESH_SERVICE_UUID,
++            payloadBase64
++          );
++          await connected.cancelConnection();
++        } catch {
++          // Peer unreachable/unsupported — packet remains safely queued.
++        } finally {
++          manager.destroy();
++          resolve();
++        }
++      });
++    });
++  } catch {
++    // react-native-ble-plx isn't linked in this build (e.g. Expo Go).
++    // No-op: the packet stays in the queue and syncs over HTTPS once
++    // any device carrying it reaches connectivity.
++  }
++}
+diff --git a/mobile-app/src/services/notifications.ts b/mobile-app/src/services/notifications.ts
+new file mode 100644
+index 0000000..26e8717
+--- /dev/null
++++ b/mobile-app/src/services/notifications.ts
+@@ -0,0 +1,71 @@
++import * as Notifications from 'expo-notifications';
++import Constants from 'expo-constants';
++import { Platform } from 'react-native';
++import { authAPI } from './api';
++
++Notifications.setNotificationHandler({
++  handleNotification: async () => ({
++    shouldShowAlert: true,
++    shouldShowBanner: true,
++    shouldShowList: true,
++    shouldPlaySound: true,
++    shouldSetBadge: false,
++  }),
++});
++
++/**
++ * Ask for notification permission, grab an Expo push token, and save it
++ * to the user's profile so the backend can reach this device.
++ * Safe to call repeatedly (e.g. on every login) — it's a no-op on failure.
++ */
++export async function registerForPushNotifications(): Promise<string | null> {
++  try {
++    if (Platform.OS === 'android') {
++      await Notifications.setNotificationChannelAsync('default', {
++        name: 'S.A.F.E. Alerts',
++        importance: Notifications.AndroidImportance.MAX,
++        vibrationPattern: [0, 250, 250, 250],
++        lightColor: '#B91C1C',
++        sound: 'default',
++      });
++    }
++
++    const { status: existingStatus } = await Notifications.getPermissionsAsync();
++    let finalStatus = existingStatus;
++    if (existingStatus !== 'granted') {
++      const { status } = await Notifications.requestPermissionsAsync();
++      finalStatus = status;
++    }
++    if (finalStatus !== 'granted') return null;
++
++    const projectId =
++      Constants.expoConfig?.extra?.eas?.projectId ??
++      Constants.easConfig?.projectId;
++
++    const tokenResponse = await Notifications.getExpoPushTokenAsync(
++      projectId ? { projectId } : undefined
++    );
++    const token = tokenResponse.data;
++
++    await authAPI.updateProfile({ push_token: token });
++
++    return token;
++  } catch (error) {
++    console.warn('Push notification registration failed:', error);
++    return null;
++  }
++}
++
++/**
++ * Listen for taps on a push notification and route the user to the
++ * relevant incident/alert. Returns an unsubscribe function.
++ */
++export function addNotificationResponseListener(
++  onTap: (data: Record<string, any>) => void
++) {
++  const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
++    const data = response.notification.request.content.data || {};
++    onTap(data as Record<string, any>);
++  });
++  return () => subscription.remove();
++}
+diff --git a/mobile-app/src/services/socket.ts b/mobile-app/src/services/socket.ts
+new file mode 100644
+index 0000000..7bbf594
+--- /dev/null
++++ b/mobile-app/src/services/socket.ts
+@@ -0,0 +1,49 @@
++import { io, Socket } from 'socket.io-client';
++import { API_URL, getToken } from './api';
++
++let socket: Socket | null = null;
++
++/**
++ * Connect (or reuse) the single Socket.io connection for the app.
++ * Call after login / on app start when a token is present.
++ */
++export async function connectSocket(): Promise<Socket | null> {
++  if (socket?.connected) return socket;
++
++  const token = await getToken();
++  if (!token) return null;
++
++  if (socket) {
++    socket.auth = { token };
++    socket.connect();
++    return socket;
++  }
++
++  socket = io(API_URL, {
++    auth: { token },
++    transports: ['websocket'],
++    reconnection: true,
++    reconnectionAttempts: Infinity,
++    reconnectionDelay: 1000,
++    reconnectionDelayMax: 10000,
++  });
++
++  return socket;
++}
++
++export function getSocket(): Socket | null {
++  return socket;
++}
++
++export function disconnectSocket() {
++  socket?.disconnect();
++  socket = null;
++}
++
++export function joinIncidentRoom(incidentId: number | string) {
++  socket?.emit('join_incident', incidentId);
++}
++
++export function leaveIncidentRoom(incidentId: number | string) {
++  socket?.emit('leave_incident', incidentId);
++}

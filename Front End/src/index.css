@@ -1,10 +1,5 @@
 @import "tailwindcss";
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
-}
-
 /* Line clamping */
 .line-clamp-1 {
   overflow: hidden;
