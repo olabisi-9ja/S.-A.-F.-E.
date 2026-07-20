@@ -34,6 +34,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#b91c1c",
