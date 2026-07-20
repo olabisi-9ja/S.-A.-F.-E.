@@ -9,14 +9,24 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_PUBLIC_BACKEND_URL"
+      }
     },
     "apk": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_PUBLIC_BACKEND_URL"
       }
     },
-    "production": {}
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://REPLACE_WITH_PUBLIC_BACKEND_URL"
+      }
+    }
   },
   "submit": {
     "production": {}
