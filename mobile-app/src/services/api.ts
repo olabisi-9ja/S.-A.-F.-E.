@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://172.31.26.202:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://s-a-f-e.onrender.com';
 
 const getToken = async () => {
   try {
