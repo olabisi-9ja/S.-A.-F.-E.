@@ -12,9 +12,13 @@ const ai = new GoogleGenAI({
   apiKey: rawApiKey.replace(/^"|"$/g, '')
 });
 
+// Simple in-memory storage for user chat histories
+const chatHistories = new Map();
+
 export const chatWithAI = async (req, res) => {
   try {
     const { message } = req.body;
+    const userId = req.userId;
 
     if (!message) {
       return res.status(400).json({ success: false, error: 'Message is required' });
@@ -49,11 +53,11 @@ export const chatWithAI = async (req, res) => {
     ).join('\n');
 
     const alertsContext = recentAlerts.map(alt => 
-      `- [${new Date(alt.created_at).toLocaleDateString()}] Alert type ${alt.type} near (${alt.latitude}, ${alt.longitude}) - Resolved: ${alt.resolved}`
+      `- [${new Date(alt.created_at).toLocaleDateString()}] Alert type ${alt.type || 'SOS'} near (${alt.latitude || 'unknown'}, ${alt.longitude || 'unknown'}) - Resolved: ${alt.resolved}`
     ).join('\n');
 
     // Create the prompt with context
-    const systemPrompt = `You are a helpful and intelligent safety analytical assistant for the S.A.F.E KWASU application. 
+    const systemPrompt = `You are a helpful and intelligent safety assistant for the S.A.F.E KWASU application. 
 You answer questions from students, staff, and security admins.
 Here is the real live and recent data of the campus for the last 7 days:
 
@@ -68,16 +72,39 @@ Use this data to answer the user's question accurately.
 - If they ask a general question, provide helpful safety advice. 
 - Be concise, professional, and analytical. Identify trends if there are multiple incidents.`;
 
+    // Manage history
+    if (!chatHistories.has(userId)) {
+      chatHistories.set(userId, [
+        { role: 'user', parts: [{ text: systemPrompt }] },
+        { role: 'model', parts: [{ text: "Understood. I will act as the S.A.F.E KWASU safety assistant and use this live data for campus reports. How can I help you today?" }] }
+      ]);
+    } else {
+      // Update system prompt with fresh live data
+      chatHistories.get(userId)[0].parts[0].text = systemPrompt;
+    }
+
+    const history = chatHistories.get(userId);
+    history.push({ role: 'user', parts: [{ text: message }] });
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [
-        { role: 'user', parts: [{ text: systemPrompt + '\n\nUser Question: ' + message }] }
-      ]
+      contents: history
     });
+
+    const reply = response.text;
+    history.push({ role: 'model', parts: [{ text: reply }] });
+
+    // Limit history size to prevent context overflow (keep system prompt, initial ack, and last 10 messages)
+    if (history.length > 12) {
+      const systemPromptMsg = history[0];
+      const initialAckMsg = history[1];
+      const recentHistory = history.slice(-10);
+      chatHistories.set(userId, [systemPromptMsg, initialAckMsg, ...recentHistory]);
+    }
 
     res.json({
       success: true,
-      data: { reply: response.text }
+      data: { reply }
     });
 
   } catch (error) {

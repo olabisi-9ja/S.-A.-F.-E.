@@ -6,6 +6,15 @@ import logger from '../utils/logger.js';
 import { generateUploadURL } from '../services/s3Service.js';
 import { pushToAdmins, pushToUser } from '../services/pushService.js';
 import validator from 'validator';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const rawApiKey = process.env.GEMINI_API_KEY || 'dummy_key_if_not_provided';
+const ai = new GoogleGenAI({
+  apiKey: rawApiKey.replace(/^"|"$/g, '')
+});
 
 export const reportTimeouts = new Map();
 
@@ -28,21 +37,43 @@ export const getUploadUrl = async (req, res) => {
   }
 };
 
-// AI Classification Service
+// AI Classification Service using Gemini
 async function classifyIncident(description) {
   try {
-    const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:8000';
-    const response = await axios.post(`${aiServiceUrl}/classify`, {
-      text: description,
-    }, { timeout: 5000 });
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'placeholder') {
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+
+    const systemPrompt = `Classify the following campus safety incident report.
+Report description: "${description}"
+
+Respond ONLY with a valid JSON object matching the format below. Do not include any markdown backticks, explanations, or leading/trailing text.
+
+Format:
+{
+  "category": "One of: Assault, Theft, Harassment, Fire, Medical, Vandalism, Suspicious Activity, General",
+  "severity_score": <number between 0 and 100>,
+  "is_suspicious": <true or false>
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] }
+      ]
+    });
+
+    const responseText = response.text.trim();
+    // Parse JSON safely
+    const parsed = JSON.parse(responseText.replace(/```json|```/g, '').trim());
 
     return {
-      ai_category_suggestion: response.data.category,
-      ai_severity_score: response.data.severity_score,
-      ai_is_suspicious: response.data.is_suspicious || false,
+      ai_category_suggestion: parsed.category || 'General',
+      ai_severity_score: parseInt(parsed.severity_score) || 50,
+      ai_is_suspicious: !!parsed.is_suspicious,
     };
   } catch (error) {
-    logger.info('AI service unavailable, using defaults:', error.message);
+    logger.warn('AI Gemini classification failed, using keyword fallback:', error.message);
     // Default classification based on keywords
     const lowerDesc = description.toLowerCase();
     let category = 'General';
@@ -70,6 +101,57 @@ async function classifyIncident(description) {
       ai_severity_score: severity,
       ai_is_suspicious: false,
     };
+  }
+}
+
+async function checkPotentialDuplicate(newDescription, newCategory) {
+  try {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'placeholder') {
+      return null;
+    }
+
+    // Query incidents of the same category reported in the last 6 hours
+    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+    const existingIncidents = await Incident.findAll({
+      where: {
+        category: newCategory,
+        created_at: { [Op.gte]: sixHoursAgo }
+      },
+      limit: 10,
+      attributes: ['id', 'description'],
+      raw: true
+    });
+
+    if (existingIncidents.length === 0) return null;
+
+    const incidentsList = existingIncidents.map(inc => `ID: ${inc.id} | Description: ${inc.description}`).join('\n');
+    
+    const systemPrompt = `Analyze if the following new incident report is a duplicate (describing the exact same event) of any existing reports.
+New Incident Description: "${newDescription}"
+Category: ${newCategory}
+
+Here are the existing reports from the last 6 hours:
+${incidentsList}
+
+Determine if the new report is a duplicate.
+Respond ONLY with a JSON object in this format. Do not include markdown backticks:
+{
+  "is_duplicate": <true or false>,
+  "duplicate_of_id": <the ID of the matching duplicate incident, or null if not a duplicate>
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] }
+      ]
+    });
+
+    const parsed = JSON.parse(response.text.trim().replace(/```json|```/g, '').trim());
+    return parsed.is_duplicate ? parsed.duplicate_of_id : null;
+  } catch (error) {
+    logger.warn('AI deduplication check failed:', error.message);
+    return null;
   }
 }
 
@@ -108,7 +190,13 @@ export const createIncident = async (req, res) => {
     // AI Classification
     const aiResult = await classifyIncident(description);
 
-    const safeDescription = validator.escape(description);
+    // AI Deduplication check
+    const duplicateOfId = await checkPotentialDuplicate(description, category || aiResult.ai_category_suggestion);
+    
+    let safeDescription = validator.escape(description);
+    if (duplicateOfId) {
+      safeDescription = `[⚠️ POTENTIAL DUPLICATE OF INCIDENT #${duplicateOfId}] ` + safeDescription;
+    }
 
     // The user has already seen the AI suggestion via /incidents/classify and
     // may confirm or override it, so their chosen category wins here.

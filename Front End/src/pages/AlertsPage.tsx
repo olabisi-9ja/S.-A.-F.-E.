@@ -34,7 +34,7 @@ export function AlertsPage() {
                 <div>
                   <p className="font-semibold text-gray-900">{a.user_name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(a.created_at).toLocaleString()}
+                    {a.created_at || a.timestamp ? new Date(a.created_at || a.timestamp).toLocaleString() : 'Just now'}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -55,7 +55,7 @@ export function AlertsPage() {
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Location: {Number(a.latitude).toFixed(6)}, {Number(a.longitude).toFixed(6)}
+                Location: {a.latitude && !isNaN(Number(a.latitude)) ? Number(a.latitude).toFixed(6) : 'Unknown'}, {a.longitude && !isNaN(Number(a.longitude)) ? Number(a.longitude).toFixed(6) : 'Unknown'}
               </p>
             </div>
           ))}

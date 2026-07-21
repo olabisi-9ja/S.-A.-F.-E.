@@ -3,6 +3,53 @@ import { Alert, User, Notification, MeshPacket } from '../models/index.js';
 import { sendSMS } from '../services/smsService.js';
 import { pushToAdmins, pushToUser } from '../services/pushService.js';
 import logger from '../utils/logger.js';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const rawApiKey = process.env.GEMINI_API_KEY || 'dummy_key_if_not_provided';
+const ai = new GoogleGenAI({
+  apiKey: rawApiKey.replace(/^"|"$/g, '')
+});
+
+async function getAlertUrgency(user, latitude, longitude) {
+  try {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'placeholder') {
+      return { timeout_ms: 15000, escalate_immediately: false, rating: 'Medium' };
+    }
+
+    const timeOfDay = new Date().toLocaleTimeString();
+    const systemPrompt = `Analyze the urgency of a campus emergency panic alert:
+User: ${user.full_name}
+Location: GPS (${latitude.toFixed(6)}, ${longitude.toFixed(6)})
+Time of trigger: ${timeOfDay}
+
+Respond ONLY with a JSON object in this format:
+{
+  "rating": "one of: High, Medium, Low",
+  "timeout_ms": <number of milliseconds to wait before triggering SMS fallback: e.g., 0 for high-risk/immediate alert, 15000 for normal, 30000 for low risk>,
+  "escalate_immediately": <true if rating is High, false otherwise>
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] }
+      ]
+    });
+
+    const parsed = JSON.parse(response.text.trim().replace(/```json|```/g, '').trim());
+    return {
+      timeout_ms: parsed.timeout_ms !== undefined ? parseInt(parsed.timeout_ms) : 15000,
+      escalate_immediately: !!parsed.escalate_immediately,
+      rating: parsed.rating || 'Medium'
+    };
+  } catch (error) {
+    logger.warn('AI alert escalation calculation failed, using defaults:', error.message);
+    return { timeout_ms: 15000, escalate_immediately: false, rating: 'Medium' };
+  }
+}
 
 export const smsTimeouts = new Map();
 
@@ -65,40 +112,46 @@ export const triggerAlert = async (req, res) => {
       data: { type: 'alert', alertId: alert.id },
     });
 
-    // Schedule SMS fallback (15 seconds if not acknowledged)
-    const smsTimeout = setTimeout(async () => {
-      try {
-        const freshAlert = await Alert.findByPk(alert.id);
-        if (freshAlert && !freshAlert.acknowledged) {
-          const securityPhone = process.env.SECURITY_PHONE;
-          if (securityPhone) {
-            await sendSMS(
-              securityPhone,
-              `🚨 SAFE ALERT: ${user.full_name} triggered emergency at GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}. Login to dashboard immediately.`
-            );
-            await freshAlert.update({
-              sms_sent: true,
-              sms_sent_at: new Date(),
-            });
+    // Calculate urgency asynchronously
+    getAlertUrgency(user, latitude, longitude).then(async (urgency) => {
+      logger.info(`🚨 Alert ${alert.id} Urgency Class: ${urgency.rating} (Immediate: ${urgency.escalate_immediately}, Timeout: ${urgency.timeout_ms}ms)`);
+      
+      const sendSMSFallback = async () => {
+        try {
+          const freshAlert = await Alert.findByPk(alert.id);
+          if (freshAlert && !freshAlert.acknowledged) {
+            const securityPhone = process.env.SECURITY_PHONE;
+            if (securityPhone) {
+              await sendSMS(
+                securityPhone,
+                `🚨 [URGENCY: ${urgency.rating}] SAFE ALERT: ${user.full_name} triggered emergency at GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}. Action required.`
+              );
+              await freshAlert.update({
+                sms_sent: true,
+                sms_sent_at: new Date(),
+              });
+            }
           }
+        } catch (smsError) {
+          logger.error('SMS fallback failed:', smsError.message);
         }
-      } catch (smsError) {
-        logger.error('SMS fallback failed:', smsError.message);
-      }
-    }, 15000);
+      };
 
-    // Store timeout reference for cleanup if acknowledged manually
-    smsTimeouts.set(alert.id, smsTimeout);
+      if (urgency.escalate_immediately) {
+        await sendSMSFallback();
+      } else {
+        const smsTimeout = setTimeout(sendSMSFallback, urgency.timeout_ms);
+        smsTimeouts.set(alert.id, smsTimeout);
+      }
+    });
 
     res.status(201).json({
       success: true,
       message: 'Emergency alert triggered successfully.',
       data: {
         alert: {
-          id: alert.id,
-          transmission_mode: alert.transmission_mode,
-          acknowledged: alert.acknowledged,
-          timestamp: alert.created_at,
+          ...alert.toJSON(),
+          user_name: user.full_name,
         },
       },
     });

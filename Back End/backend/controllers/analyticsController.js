@@ -2,6 +2,15 @@ import { Incident, Alert, User } from '../models/index.js';
 import { Op, fn, col } from 'sequelize';
 import { dateDiffSeconds, dateTrunc } from '../config/dialectHelpers.js';
 import logger from '../utils/logger.js';
+import { GoogleGenAI } from '@google/genai';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const rawApiKey = process.env.GEMINI_API_KEY || 'dummy_key_if_not_provided';
+const ai = new GoogleGenAI({
+  apiKey: rawApiKey.replace(/^"|"$/g, '')
+});
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -255,5 +264,167 @@ export const getIncidentTrend = async (req, res) => {
       success: false, 
       error: 'Failed to fetch trend data.' 
     });
+  }
+};
+
+export const getAIBriefing = async (req, res) => {
+  try {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'placeholder') {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'AI Security Briefing is currently unavailable (GEMINI_API_KEY not configured).' 
+      });
+    }
+
+    const now = new Date();
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const recentIncidents = await Incident.findAll({
+      where: { created_at: { [Op.gte]: weekAgo } },
+      attributes: ['category', 'description', 'ai_severity_score', 'created_at', 'status'],
+      raw: true
+    });
+
+    const recentAlerts = await Alert.findAll({
+      where: { created_at: { [Op.gte]: weekAgo } },
+      attributes: ['id', 'latitude', 'longitude', 'resolved', 'created_at'],
+      raw: true
+    });
+
+    const incidentsSummary = recentIncidents.map(inc => 
+      `- [${new Date(inc.created_at).toLocaleDateString()}] ${inc.category} (Severity: ${inc.ai_severity_score}, Status: ${inc.status}): ${inc.description}`
+    ).join('\n');
+
+    const alertsSummary = recentAlerts.map(alt => 
+      `- [${new Date(alt.created_at).toLocaleDateString()}] Emergency SOS at (${alt.latitude || 'unknown'}, ${alt.longitude || 'unknown'}) - Resolved: ${alt.resolved}`
+    ).join('\n');
+
+    const systemPrompt = `You are a professional Security Analyst assistant for S.A.F.E. (Smart Alert and Field Emergency) campus safety application at KWASU.
+Analyze the following safety data from the last 7 days and generate a concise, executive safety briefing.
+
+Data Summary:
+Recent Incidents (Last 7 Days):
+${incidentsSummary || 'None reported.'}
+
+Recent Emergency SOS Alerts (Last 7 Days):
+${alertsSummary || 'None triggered.'}
+
+Structure your briefing in clean HTML format with the following sections (use clear headings like <h3>, bullet points, and strong tags):
+1. **Weekly Overview**: A high-level summary of security activity.
+2. **Key Security Trends**: Identify any patterns (e.g., specific locations, times, repeating categories).
+3. **Response & Resolution Review**: Summary of resolved vs unresolved items.
+4. **Actionable Security Recommendations**: Suggested interventions (e.g., increase patrol at X, host safety webinar for Y).
+5. **Overall Campus Safety Index**: Suggest a rating (e.g., "Good", "Moderate Risk", etc.) with brief reasoning.
+
+Keep the tone professional, direct, and security-focused. Format output in clean, plain HTML. Do not include markdown \`\`\`html tags.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] }
+      ]
+    });
+
+    res.json({
+      success: true,
+      data: { briefing: response.text }
+    });
+  } catch (error) {
+    logger.error('Get AI Briefing error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate AI security briefing.' });
+  }
+};
+
+export const getPredictiveRisk = async (req, res) => {
+  try {
+    if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'placeholder') {
+      return res.status(503).json({ 
+        success: false, 
+        error: 'Predictive risk modeling is currently unavailable (GEMINI_API_KEY not configured).' 
+      });
+    }
+
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+    const historicalIncidents = await Incident.findAll({
+      where: {
+        created_at: { [Op.gte]: ninetyDaysAgo },
+        latitude: { [Op.ne]: null },
+        longitude: { [Op.ne]: null }
+      },
+      attributes: ['category', 'latitude', 'longitude', 'created_at', 'ai_severity_score'],
+      raw: true
+    });
+
+    const historicalAlerts = await Alert.findAll({
+      where: {
+        created_at: { [Op.gte]: ninetyDaysAgo },
+        latitude: { [Op.ne]: null },
+        longitude: { [Op.ne]: null }
+      },
+      attributes: ['latitude', 'longitude', 'created_at'],
+      raw: true
+    });
+
+    const incidentsData = historicalIncidents.map(inc => ({
+      category: inc.category,
+      lat: parseFloat(inc.latitude),
+      lng: parseFloat(inc.longitude),
+      time: new Date(inc.created_at).getHours(),
+      day: new Date(inc.created_at).getDay(),
+      severity: inc.ai_severity_score
+    }));
+
+    const alertsData = historicalAlerts.map(alt => ({
+      lat: parseFloat(alt.latitude),
+      lng: parseFloat(alt.longitude),
+      time: new Date(alt.created_at).getHours(),
+      day: new Date(alt.created_at).getDay()
+    }));
+
+    const dataString = JSON.stringify({ incidents: incidentsData, alerts: alertsData });
+
+    const systemPrompt = `You are an advanced predictive safety AI model for S.A.F.E. KWASU campus application.
+Analyze the following historical safety coordinates and times from the last 90 days. Detect spatial clusters (risk zones) and temporal clusters (vulnerable times).
+
+Data:
+${dataString}
+
+Based on this data, predict the risk zones for the upcoming week.
+Respond ONLY with a valid JSON object matching the format below. Do not include markdown backticks or explanations.
+
+Format:
+{
+  "risk_zones": [
+    {
+      "name": "Location description (e.g. Near Engineering Lecture Theater, Female Hostel Area)",
+      "lat": <approximate center latitude>,
+      "lng": <approximate center longitude>,
+      "risk_level": "one of: High, Medium, Low",
+      "vulnerable_hours": "e.g., 6:00 PM - 10:00 PM",
+      "primary_risk_category": "e.g., Theft, Harassment",
+      "reasoning": "brief explanation of prediction based on historical clusters"
+    }
+  ],
+  "top_safety_warnings": [
+    "e.g., Increase patrols near the library after 9 PM due to clustered theft reports."
+  ]
+}`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        { role: 'user', parts: [{ text: systemPrompt }] }
+      ]
+    });
+
+    const parsed = JSON.parse(response.text.trim().replace(/```json|```/g, '').trim());
+
+    res.json({
+      success: true,
+      data: parsed
+    });
+  } catch (error) {
+    logger.error('Get predictive risk error:', error);
+    res.status(500).json({ success: false, error: 'Failed to generate predictive risk modeling.' });
   }
 };

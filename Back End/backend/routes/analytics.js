@@ -3,6 +3,8 @@ import {
   getDashboardStats,
   getHotspots,
   getIncidentTrend,
+  getAIBriefing,
+  getPredictiveRisk,
 } from '../controllers/analyticsController.js';
 import { authMiddleware, adminMiddleware } from '../middleware/auth.js';
 
@@ -20,5 +22,11 @@ router.get('/hotspots', getHotspots);
 
 // Incident trend data
 router.get('/trend', getIncidentTrend);
+
+// AI Security Briefing
+router.get('/ai-briefing', getAIBriefing);
+
+// AI Predictive Risk Mapping
+router.get('/predictive-risk', getPredictiveRisk);
 
 export default router;
