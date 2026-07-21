@@ -11,17 +11,12 @@ const dialect = process.env.DB_DIALECT || 'mysql';
 
 let sequelize;
 
-if (dialect === 'sqlite') {
-  sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: path.join(__dirname, '..', 'safe_dev.sqlite'),
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
-  });
-} else if (process.env.DATABASE_URL) {
+// DATABASE_URL takes top priority — this is the production path (Supabase / Render)
+if (process.env.DATABASE_URL) {
   sequelize = new Sequelize(process.env.DATABASE_URL, {
     dialect: 'postgres',
     dialectOptions: {
-      ssl: process.env.DB_REQUIRE_SSL === 'true' ? { require: true, rejectUnauthorized: false } : false
+      ssl: { require: true, rejectUnauthorized: false }
     },
     logging: process.env.NODE_ENV === 'development' ? console.log : false,
     pool: {
@@ -30,6 +25,12 @@ if (dialect === 'sqlite') {
       acquire: 30000,
       idle: 10000,
     },
+  });
+} else if (dialect === 'sqlite') {
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: path.join(__dirname, '..', 'safe_dev.sqlite'),
+    logging: process.env.NODE_ENV === 'development' ? console.log : false,
   });
 } else {
   sequelize = new Sequelize(
