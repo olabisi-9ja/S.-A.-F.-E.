@@ -29,17 +29,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('safe_token');
+    const cachedUser = localStorage.getItem('safe_user');
+    
     if (token) {
+      if (cachedUser) {
+        try {
+          setUser(JSON.parse(cachedUser));
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+      
       authAPI.getProfile().then(result => {
         if (result.success && result.data?.user) {
           setUser(result.data.user);
-        } else {
-          localStorage.removeItem('safe_token');
-          localStorage.removeItem('safe_refresh_token');
+          localStorage.setItem('safe_user', JSON.stringify(result.data.user));
+        } else if (result.success === false) {
+          const isAuthError = 
+            result.error?.toLowerCase().includes('token') || 
+            result.error?.toLowerCase().includes('denied') || 
+            result.error?.toLowerCase().includes('expired') || 
+            result.error?.toLowerCase().includes('credentials') ||
+            result.error?.toLowerCase().includes('invalid');
+            
+          if (isAuthError) {
+            localStorage.removeItem('safe_token');
+            localStorage.removeItem('safe_refresh_token');
+            localStorage.removeItem('safe_user');
+            setUser(null);
+          }
         }
         setIsLoading(false);
       }).catch(() => {
-        setIsLoading(false);
+        setIsLoading(false); // Ignore network error, keep local session
       });
     } else {
       setIsLoading(false);
@@ -54,6 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.data.refreshToken) {
         localStorage.setItem('safe_refresh_token', result.data.refreshToken);
       }
+      localStorage.setItem('safe_user', JSON.stringify(result.data.user));
       setUser(result.data.user);
       return { success: true };
     }
@@ -69,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (result.data.refreshToken) {
         localStorage.setItem('safe_refresh_token', result.data.refreshToken);
       }
+      localStorage.setItem('safe_user', JSON.stringify(result.data.user));
       setUser(result.data.user);
       return { success: true };
     }
@@ -95,6 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       localStorage.removeItem('safe_token');
       localStorage.removeItem('safe_refresh_token');
+      localStorage.removeItem('safe_user');
       setUser(null);
     }
   }, []);
@@ -103,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const result = await authAPI.getProfile();
     if (result.success && result.data?.user) {
       setUser(result.data.user);
+      localStorage.setItem('safe_user', JSON.stringify(result.data.user));
     }
   }, []);
 

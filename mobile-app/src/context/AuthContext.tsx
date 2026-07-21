@@ -41,21 +41,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Load token from storage on startup
+    // Load token and user from storage on startup
     const loadToken = async () => {
       try {
         const storedToken = await AsyncStorage.getItem('safe_token');
+        const storedUser = await AsyncStorage.getItem('safe_user');
+        
         if (storedToken) {
           setToken(storedToken);
-          // Try to fetch profile if we have token
+          if (storedUser) {
+            setUser(JSON.parse(storedUser));
+            activateSession();
+            setIsLoading(false); // Instantly restore local session
+          }
+          
+          // Verify/refresh user profile in the background
           const result = await api.get('/api/auth/profile');
           if (result && result.success && result.data && result.data.user) {
             setUser(result.data.user);
+            await AsyncStorage.setItem('safe_user', JSON.stringify(result.data.user));
             activateSession();
-          } else {
-             // Invalid token fallback
-             await AsyncStorage.removeItem('safe_token');
-             setToken(null);
+          } else if (result && result.success === false) {
+            const isAuthError = 
+              result.error?.toLowerCase().includes('token') || 
+              result.error?.toLowerCase().includes('denied') || 
+              result.error?.toLowerCase().includes('expired') || 
+              result.error?.toLowerCase().includes('credentials') ||
+              result.error?.toLowerCase().includes('invalid');
+              
+            if (isAuthError) {
+              // Explicit authentication error means token is expired/invalidated
+              await AsyncStorage.removeItem('safe_token');
+              await AsyncStorage.removeItem('safe_user');
+              setToken(null);
+              setUser(null);
+            }
           }
         }
       } catch (e) {
@@ -74,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await api.get('/api/auth/profile');
       if (result && result.success && result.data && result.data.user) {
         setUser(result.data.user);
+        await AsyncStorage.setItem('safe_user', JSON.stringify(result.data.user));
         activateSession();
       }
     } catch (e) {
@@ -85,6 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       disconnectSocket();
       await AsyncStorage.removeItem('safe_token');
+      await AsyncStorage.removeItem('safe_user');
       setToken(null);
       setUser(null);
     } catch (e) {
