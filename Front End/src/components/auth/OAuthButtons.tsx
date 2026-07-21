@@ -6,9 +6,10 @@ import { useNavigate } from 'react-router-dom';
 interface OAuthButtonsProps {
   onError?: (error: string) => void;
   isLoading?: boolean;
+  mode?: 'login' | 'register';
 }
 
-export function OAuthButtons({ onError, isLoading }: OAuthButtonsProps) {
+export function OAuthButtons({ onError, isLoading, mode = 'login' }: OAuthButtonsProps) {
   const { loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -46,7 +47,7 @@ export function OAuthButtons({ onError, isLoading }: OAuthButtonsProps) {
             theme="outline"
             size="large"
             width="100%"
-            text="signin_with"
+            text={mode === 'register' ? 'signup_with' : 'signin_with'}
             shape="rectangular"
             logo_alignment="center"
           />

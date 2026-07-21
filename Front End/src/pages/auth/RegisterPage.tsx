@@ -181,7 +181,7 @@ export function RegisterPage({ onNavigate }: RegisterPageProps) {
             <span className="text-xs text-gray-400">or</span>
             <div className="flex-1 h-px bg-gray-200" />
           </div>
-          <OAuthButtons onError={(err) => setError(err)} />
+          <OAuthButtons mode="register" onError={(err) => setError(err)} />
         </div>
 
         <p className="mt-6 text-center text-sm text-gray-500">
