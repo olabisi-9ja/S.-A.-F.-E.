@@ -54,7 +54,10 @@ export const register = async (req, res) => {
       email_verified: false,
     });
 
-    const emailResult = await sendVerificationEmail(institutional_email, verificationToken);
+    // Send email asynchronously in the background so registration is fast and doesn't hang if SMTP times out
+    sendVerificationEmail(institutional_email, verificationToken).catch(err => {
+      logger.error('Background verification email failed to send:', err);
+    });
 
     res.status(201).json({
       success: true,
