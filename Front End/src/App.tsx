@@ -105,8 +105,8 @@ function Router() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Redirect root / directly to /login */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Dark Command Center Landing Page */}
+        <Route path="/" element={<PublicRoute><PageWrapper component={LandingPage} /></PublicRoute>} />
         
         {/* Public Routes */}
         <Route path="/login" element={<PublicRoute><PageWrapper component={LoginPage} /></PublicRoute>} />
