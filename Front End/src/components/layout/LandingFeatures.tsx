@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Crosshair, Smartphone, BrainCircuit, Radio, Activity, Zap, Lock, MapPin } from 'lucide-react';
+import { Users, Crosshair, Smartphone, BrainCircuit, Radio, Activity, Zap, Lock, MapPin, Shield } from 'lucide-react';
 
 export const LandingFeatures = () => {
   return (

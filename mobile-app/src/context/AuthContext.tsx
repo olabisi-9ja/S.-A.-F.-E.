@@ -48,33 +48,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedUser = await AsyncStorage.getItem('safe_user');
         
         if (storedToken) {
-          setToken(storedToken);
           if (storedUser) {
+            setToken(storedToken);
             setUser(JSON.parse(storedUser));
             activateSession();
             setIsLoading(false); // Instantly restore local session
-          }
-          
-          // Verify/refresh user profile in the background
-          const result = await api.get('/api/auth/profile');
-          if (result && result.success && result.data && result.data.user) {
-            setUser(result.data.user);
-            await AsyncStorage.setItem('safe_user', JSON.stringify(result.data.user));
-            activateSession();
-          } else if (result && result.success === false) {
-            const isAuthError = 
-              result.error?.toLowerCase().includes('token') || 
-              result.error?.toLowerCase().includes('denied') || 
-              result.error?.toLowerCase().includes('expired') || 
-              result.error?.toLowerCase().includes('credentials') ||
-              result.error?.toLowerCase().includes('invalid');
-              
-            if (isAuthError) {
-              // Explicit authentication error means token is expired/invalidated
+            
+            // Verify/refresh user profile in the background quietly
+            api.get('/api/auth/profile').then(async (result) => {
+              if (result && result.success && result.data && result.data.user) {
+                setUser(result.data.user);
+                await AsyncStorage.setItem('safe_user', JSON.stringify(result.data.user));
+              } else if (result && result.success === false) {
+                const isAuthError = 
+                  result.error?.toLowerCase().includes('token') || 
+                  result.error?.toLowerCase().includes('denied') || 
+                  result.error?.toLowerCase().includes('expired') || 
+                  result.error?.toLowerCase().includes('credentials') ||
+                  result.error?.toLowerCase().includes('invalid');
+                  
+                if (isAuthError) {
+                  await AsyncStorage.removeItem('safe_token');
+                  await AsyncStorage.removeItem('safe_user');
+                  setToken(null);
+                  setUser(null);
+                }
+              }
+            }).catch(() => {
+              // Ignore background sync errors if we already have a cached session
+            });
+          } else {
+            // Token exists but cached user doesn't. We must fetch the profile synchronously before proceeding!
+            const result = await api.get('/api/auth/profile');
+            if (result && result.success && result.data && result.data.user) {
+              setToken(storedToken);
+              setUser(result.data.user);
+              await AsyncStorage.setItem('safe_user', JSON.stringify(result.data.user));
+              activateSession();
+            } else {
+              // If it fails, clear the token to force a clean login
               await AsyncStorage.removeItem('safe_token');
-              await AsyncStorage.removeItem('safe_user');
-              setToken(null);
-              setUser(null);
             }
           }
         }
