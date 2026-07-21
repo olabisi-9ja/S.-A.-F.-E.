@@ -5,6 +5,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import cron from 'node-cron';
+import rateLimit from 'express-rate-limit';
 
 // Load environment variables
 dotenv.config();
@@ -57,10 +58,25 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
+// Trust proxy since app is deployed behind a reverse proxy (e.g., Render)
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable for development
+  contentSecurityPolicy: false, // Disable for development, adjust for prod as needed
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
+
+// Global Rate Limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 500, // Limit each IP to 500 requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests from this IP, please try again later.' }
+});
+
+app.use('/api', globalLimiter);
 
 app.use(cors(corsOptions));
 
@@ -83,7 +99,18 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Strict Rate Limiting for Auth
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // Limit each IP to 15 login/register requests per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts, please try again later.' }
+});
+
 // API Routes
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/alerts', alertRoutes);
