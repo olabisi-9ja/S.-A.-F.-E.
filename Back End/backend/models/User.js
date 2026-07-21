@@ -91,6 +91,7 @@ User.beforeUpdate(async (user) => {
 
 // Instance method to compare password
 User.prototype.comparePassword = async function(candidatePassword) {
+  if (!this.password_hash) return false;
   return await bcrypt.compare(candidatePassword, this.password_hash);
 };
 

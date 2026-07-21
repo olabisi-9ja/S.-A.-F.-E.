@@ -112,6 +112,10 @@ export const login = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Please verify your email before logging in.' });
     }
 
+    if (!user.password_hash) {
+      return res.status(400).json({ success: false, error: 'This account was registered using Google. Please log in with Google.' });
+    }
+
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: 'Invalid credentials.' });
