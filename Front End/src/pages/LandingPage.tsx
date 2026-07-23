@@ -120,7 +120,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center gap-8">
-              <a href="#how-it-works" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Pipeline</a>
+              <a href="#how-it-works" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Workflow</a>
               <a href="#features" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Specs</a>
               <div className="flex items-center gap-4 pl-6 border-l border-zinc-800">
                 <button 
@@ -152,7 +152,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden absolute top-full left-0 w-full bg-zinc-950 border-b border-zinc-800 py-6 px-6 flex flex-col gap-6">
-            <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="font-mono text-sm tracking-widest text-zinc-300 uppercase">Pipeline</a>
+            <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="font-mono text-sm tracking-widest text-zinc-300 uppercase">Workflow</a>
             <a href="#features" onClick={() => setMobileMenuOpen(false)} className="font-mono text-sm tracking-widest text-zinc-300 uppercase">Specs</a>
             <div className="h-px bg-zinc-800 my-2" />
             <button 
@@ -211,7 +211,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
               onClick={() => onNavigate('login')}
               className="w-full sm:w-auto px-8 py-4 bg-transparent text-white border border-zinc-700 font-mono text-sm tracking-widest uppercase hover:border-white transition-colors hover:bg-zinc-900"
             >
-              Access Terminal
+              Admin Login
             </button>
           </div>
         </div>
@@ -222,7 +222,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-20 flex flex-col md:flex-row md:items-end justify-between gap-8">
             <div>
-              <div className="font-mono text-red-600 text-sm tracking-widest uppercase mb-4">Pipeline</div>
+              <div className="font-mono text-red-600 text-sm tracking-widest uppercase mb-4">Workflow</div>
               <h2 className="text-3xl md:text-5xl font-bold text-white uppercase tracking-tight">System Workflow</h2>
             </div>
             <p className="text-zinc-500 max-w-md text-sm border-l border-zinc-800 pl-4 font-mono leading-relaxed">
