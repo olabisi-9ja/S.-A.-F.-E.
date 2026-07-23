@@ -15,7 +15,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
   const features = [
     {
       title: 'One-Tap SOS',
-      description: 'Students trigger a geolocated emergency alert in under 3 seconds — no forms, no menus.',
+      description: 'Students trigger a geolocated emergency alert in under 3 seconds with no forms or menus.',
       icon: <Siren className="w-5 h-5 text-[#3B82F6]" />,
       iconBg: 'bg-[#3B82F6]/10'
     },
@@ -70,22 +70,25 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
       <nav className={`fixed w-full z-50 transition-all duration-300 ${isScrolled ? 'bg-[#070A11]/80 backdrop-blur-md border-b border-white/5 py-4' : 'bg-transparent py-6'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
           <div className="flex justify-between items-center h-10">
-            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => window.scrollTo({top:0, behavior:'smooth'})}>
-              <span className="text-zinc-500 text-[10px] font-mono uppercase tracking-widest hover:text-white transition-colors">
-                &lt; PORTFOLIO
-              </span>
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo({top:0, behavior:'smooth'})}>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <Siren className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-white font-bold tracking-widest uppercase" style={{ fontFamily: '"Outfit", system-ui, -apple-system, sans-serif' }}>S.A.F.E.</span>
             </div>
             
-            <div className="absolute left-1/2 -translate-x-1/2 font-bold text-sm tracking-wide text-white">
-              Olabisi Adigun
+            <div className="flex items-center gap-8 hidden md:flex">
+              <a href="#how-it-works" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">How it Works</a>
+              <a href="#tech" className="text-sm font-medium text-zinc-400 hover:text-white transition-colors">Technology</a>
             </div>
             
             <div className="flex items-center">
               <button 
-                className="text-[10px] font-mono tracking-widest text-zinc-400 hover:text-white transition-colors border border-zinc-800 rounded-full px-4 py-1.5 hover:bg-zinc-900 flex items-center gap-2"
+                onClick={() => onNavigate('login')}
+                className="text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-full px-5 py-2.5 flex items-center gap-2"
               >
-                <span className="text-zinc-500">*</span>
-                LIGHT
+                Login to Dashboard
+                <ArrowUpRight className="w-3 h-3" />
               </button>
             </div>
           </div>
@@ -103,7 +106,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
           
           <div className="max-w-xl mb-12">
             <p className="text-lg md:text-xl text-zinc-400 leading-relaxed font-light">
-              Smart Alert and Field Emergency — a <strong className="text-white font-medium">campus-wide safety platform</strong> built for KWASU, with AI triage, real-time dispatch, and offline mesh networking.
+              Smart Alert and Field Emergency is a <strong className="text-white font-medium">campus-wide safety platform</strong> built for KWASU. It features AI triage, real-time dispatch, and offline mesh networking.
             </p>
           </div>
           
@@ -150,7 +153,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
                 Emergency response in your pocket.
               </h2>
               <p className="text-lg text-zinc-400 leading-relaxed mb-10 max-w-lg font-light">
-                The student-facing app is built for speed. The SOS button is always one tap away — no authentication required in an emergency.
+                The student-facing app is built for speed. The SOS button is always one tap away, and it requires no authentication during an emergency.
               </p>
               
               <div className="flex flex-wrap gap-4">
@@ -238,6 +241,64 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             ))}
           </div>
 
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-32 relative z-10 bg-[#070A11]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-20">
+            <div className="text-zinc-500 font-mono text-[10px] tracking-widest uppercase mb-6">
+              The Process
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white tracking-tight leading-[1.1] mb-6" style={{ fontFamily: '"Outfit", system-ui, -apple-system, sans-serif' }}>
+              How S.A.F.E. Works
+            </h2>
+            <p className="text-lg text-zinc-400 font-light max-w-2xl">
+              From the moment an emergency occurs to its resolution, our platform ensures seamless communication between students and campus security.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-12 relative">
+            {/* Connecting line */}
+            <div className="hidden md:block absolute top-8 left-12 right-12 h-px bg-zinc-800/80"></div>
+            
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-[#12151D] border border-zinc-800 flex items-center justify-center text-blue-500 font-bold text-xl mb-6 relative z-10">1</div>
+              <h3 className="text-xl font-bold text-white mb-3">Incident Occurs</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed font-light">A student faces an emergency and taps the SOS button or submits a detailed report via the mobile app. The device immediately captures precise geolocation data.</p>
+            </div>
+            
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-[#12151D] border border-zinc-800 flex items-center justify-center text-purple-500 font-bold text-xl mb-6 relative z-10">2</div>
+              <h3 className="text-xl font-bold text-white mb-3">AI Triage & Routing</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed font-light">The backend processes the incoming request. For reports, natural language processing categorizes the severity and type of incident, instantly alerting the appropriate responder teams.</p>
+            </div>
+            
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-[#12151D] border border-zinc-800 flex items-center justify-center text-indigo-500 font-bold text-xl mb-6 relative z-10">3</div>
+              <h3 className="text-xl font-bold text-white mb-3">Rapid Dispatch</h3>
+              <p className="text-zinc-400 text-sm leading-relaxed font-light">Security officers view the live incident on their Mapbox dashboard. They accept the dispatch, update their status, and resolve the issue, keeping the student notified in real-time.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Tech Stack Section */}
+      <section id="tech" className="py-32 relative z-10 bg-[#0A0D15]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-white tracking-tight mb-16" style={{ fontFamily: '"Outfit", system-ui, -apple-system, sans-serif' }}>
+            Powered by Modern Tech
+          </h2>
+          
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50">
+            <div className="text-xl font-bold text-white tracking-widest font-mono">REACT</div>
+            <div className="text-xl font-bold text-white tracking-widest font-mono">NODE.JS</div>
+            <div className="text-xl font-bold text-white tracking-widest font-mono">MONGODB</div>
+            <div className="text-xl font-bold text-white tracking-widest font-mono">SOCKET.IO</div>
+            <div className="text-xl font-bold text-white tracking-widest font-mono">EXPO</div>
+            <div className="text-xl font-bold text-white tracking-widest font-mono">MAPBOX</div>
+          </div>
         </div>
       </section>
 
