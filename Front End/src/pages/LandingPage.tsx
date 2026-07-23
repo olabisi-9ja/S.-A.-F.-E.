@@ -173,7 +173,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
       </nav>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 flex items-center min-h-screen z-10">
+      <section className="relative pt-24 pb-16 lg:pt-32 lg:pb-24 flex items-center min-h-[90vh] z-10">
         
         {/* Technical Radar Graphic */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] pointer-events-none opacity-20">
@@ -186,14 +186,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full flex flex-col items-center md:items-start text-center md:text-left">
-          
-          <div className="inline-flex items-center gap-3 px-3 py-1.5 border border-red-900 bg-red-950/30 text-red-500 font-mono text-[10px] uppercase tracking-widest mb-8">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full bg-red-500 opacity-75"></span>
-              <span className="relative inline-flex h-2 w-2 bg-red-600"></span>
-            </span>
-            System Status: Active Monitoring
-          </div>
           
           <h1 className="text-5xl md:text-7xl font-bold text-white tracking-tight mb-6 max-w-3xl leading-[1.1] uppercase">
             Empowering <br />
