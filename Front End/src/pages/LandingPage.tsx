@@ -115,7 +115,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
               </div>
               <div className="flex flex-col">
                 <span className="font-mono font-bold text-lg tracking-widest text-white leading-none">S.A.F.E.</span>
-                <span className="font-mono text-[10px] text-zinc-500 tracking-[0.2em] mt-1 uppercase">Sys_Online</span>
               </div>
             </div>
             
@@ -128,13 +127,13 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
                   onClick={() => onNavigate('login')}
                   className="font-mono text-xs tracking-widest text-zinc-300 hover:text-white transition-colors uppercase"
                 >
-                  [ Authenticate ]
+                  [ Login ]
                 </button>
                 <button 
                   onClick={() => onNavigate('register')}
                   className="relative group bg-red-600 text-white font-mono text-xs tracking-widest uppercase px-6 py-3 overflow-hidden border border-red-500 hover:bg-red-700 transition-colors"
                 >
-                  <span className="relative z-10">Initialize</span>
+                  <span className="relative z-10">Sign Up</span>
                   <div className="absolute inset-0 bg-red-500 translate-y-[100%] group-hover:translate-y-0 transition-transform duration-300"></div>
                 </button>
               </div>
@@ -160,13 +159,13 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
               onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }}
               className="text-left font-mono text-sm tracking-widest text-zinc-300 uppercase"
             >
-              Authenticate
+              Login
             </button>
             <button 
               onClick={() => { onNavigate('register'); setMobileMenuOpen(false); }}
               className="bg-red-600 text-white text-center py-4 font-mono text-sm tracking-widest uppercase border border-red-500"
             >
-              Initialize Profile
+              Sign Up
             </button>
           </div>
         )}
