@@ -195,7 +195,7 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
           </h1>
           
           <p className="text-lg text-zinc-400 mb-12 max-w-2xl leading-relaxed font-light border-l-2 border-zinc-800 pl-6 text-left">
-            The Student Alert & Fast Emergency (S.A.F.E.) system connects you directly to campus security with intelligent AI routing, live location tracking, and offline mesh fallbacks. Built for speed. Engineered for reliability.
+            The Smart Alert and Field Emergency (S.A.F.E.) system connects you directly to campus security with intelligent AI routing, live location tracking, and offline mesh fallbacks. Built for speed. Engineered for reliability.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center gap-6 w-full sm:w-auto">
