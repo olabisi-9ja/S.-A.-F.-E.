@@ -123,7 +123,6 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
             <div className="hidden md:flex items-center gap-8">
               <a href="#how-it-works" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Pipeline</a>
               <a href="#features" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Specs</a>
-              <a href="#tech" className="font-mono text-xs tracking-widest text-zinc-400 hover:text-red-500 transition-colors uppercase">Tech</a>
               <div className="flex items-center gap-4 pl-6 border-l border-zinc-800">
                 <button 
                   onClick={() => onNavigate('login')}
@@ -285,21 +284,83 @@ export function LandingPage({ onNavigate }: { onNavigate: (path: string) => void
         </div>
       </section>
 
-      {/* Tech Stack Section */}
-      <section id="tech" className="py-24 relative z-10 border-t border-zinc-900 bg-zinc-950/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="font-mono text-red-600 text-sm tracking-widest uppercase mb-4">Infrastructure</div>
-          <h2 className="text-3xl md:text-4xl font-bold text-white uppercase tracking-tight mb-16">
-            Powered By Modern Tech
-          </h2>
-          
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50">
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">React</div>
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">Node.js</div>
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">MongoDB</div>
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">Socket.io</div>
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">Expo</div>
-            <div className="text-xl font-bold text-zinc-500 hover:text-white transition-colors tracking-widest font-mono uppercase">Mapbox</div>
+      {/* App Showcase Section */}
+      <section className="py-32 relative z-10 bg-black border-t border-zinc-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            
+            {/* Text Content */}
+            <div className="order-2 lg:order-1">
+              <div className="text-red-500 font-mono text-[10px] tracking-widest uppercase mb-8 flex items-center gap-4">
+                <span className="font-bold">01</span>
+                <span className="w-1 h-1 bg-red-500 rounded-full"></span>
+                <span>Mobile Terminal</span>
+              </div>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white tracking-tight mb-8 leading-[1.1] uppercase">
+                Emergency response in your pocket.
+              </h2>
+              <p className="text-lg text-zinc-400 leading-relaxed mb-10 max-w-lg font-light border-l border-zinc-800 pl-4 font-mono text-sm">
+                The student-facing app is built for speed. The SOS button is always one tap away, and it requires no authentication during an emergency.
+              </p>
+              
+              <div className="flex flex-wrap gap-4">
+                {['React Native', 'Expo', 'BLE Mesh', 'Expo Location'].map(tech => (
+                  <div key={tech} className="px-5 py-2 border border-zinc-800 bg-zinc-950 text-xs font-mono text-zinc-500 uppercase tracking-widest hover:border-red-900 transition-colors">
+                    {tech}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Phone Mockup CSS */}
+            <div className="order-1 lg:order-2 relative flex justify-center lg:justify-end">
+              {/* Glow Behind Phone */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-red-900/10 rounded-full blur-[80px]"></div>
+              
+              <div className="relative w-[280px] h-[580px] bg-black rounded-[45px] border-[8px] border-zinc-900 shadow-2xl overflow-hidden flex flex-col items-center justify-center p-6 mx-auto lg:mr-8 group">
+                {/* Phone Notch/Dynamic Island */}
+                <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-zinc-950 rounded-full z-20"></div>
+                
+                {/* Phone Status Bar */}
+                <div className="absolute top-5 left-6 text-[10px] text-zinc-500 font-medium z-20">9:41</div>
+                <div className="absolute top-5 right-6 flex items-center gap-1 z-20">
+                  <div className="w-1 h-1 bg-red-500 rounded-full"></div>
+                  <div className="w-1 h-1 bg-zinc-500 rounded-full"></div>
+                  <div className="w-1 h-1 bg-zinc-500 rounded-full"></div>
+                </div>
+
+                {/* Background gradient for the phone */}
+                <div className="absolute inset-0 bg-zinc-950" 
+                     style={{ 
+                       backgroundImage: `linear-gradient(rgba(255,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,0,0,0.03) 1px, transparent 1px)`,
+                       backgroundSize: '20px 20px' 
+                     }}></div>
+
+                {/* SOS Button Area */}
+                <div className="relative w-full aspect-square flex items-center justify-center mt-12">
+                  {/* Expanding Rings */}
+                  <div className="absolute inset-[-10px] bg-red-500/5 rounded-full animate-ping" style={{ animationDuration: '3s' }}></div>
+                  <div className="absolute inset-4 bg-red-500/10 rounded-full animate-ping" style={{ animationDuration: '3s', animationDelay: '0.5s' }}></div>
+                  <div className="absolute inset-12 bg-red-500/20 rounded-full animate-ping" style={{ animationDuration: '3s', animationDelay: '1s' }}></div>
+                  <div className="absolute inset-0 bg-red-500/10 rounded-full border border-red-900/30"></div>
+                  <div className="absolute inset-10 bg-red-500/15 rounded-full border border-red-500/20"></div>
+                  
+                  {/* The Button */}
+                  <div className="relative z-10 w-28 h-28 bg-red-600 rounded-full shadow-[0_0_40px_rgba(220,38,38,0.3)] flex items-center justify-center cursor-pointer hover:scale-95 transition-transform group-hover:shadow-[0_0_60px_rgba(220,38,38,0.5)]">
+                    <span className="text-white font-mono font-bold text-xl tracking-widest">SOS</span>
+                  </div>
+                </div>
+
+                {/* Bottom Text */}
+                <div className="absolute bottom-12 left-0 right-0 text-center text-[9px] tracking-[0.2em] uppercase text-red-500/50 font-mono">
+                  Hold to activate
+                </div>
+                
+                {/* Home indicator */}
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1/3 h-1 bg-zinc-800 rounded-full"></div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
