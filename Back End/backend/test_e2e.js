@@ -1,4 +1,4 @@
-import fetch from 'node-fetch'; // We will just use native fetch in node 18+
+// We will just use native fetch in node 18+
 
 const API_URL = 'http://localhost:5000/api';
 let token = '';

@@ -196,7 +196,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return false;
   }, []);
 
-  const sendMessage = useCallback(async (incident_id: number, sender_id: number, sender_name: string, sender_role: string, content: string) => {
+  const sendMessage = useCallback(async (incident_id: number, _sender_id: number, _sender_name: string, _sender_role: string, content: string) => {
     const result = await messagesAPI.send(incident_id, content);
     if (result.success && result.data) {
       setMessages(prev => [...prev, result.data!.message]);
