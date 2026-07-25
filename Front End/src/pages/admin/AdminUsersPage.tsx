@@ -21,7 +21,6 @@ export function AdminUsersPage() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
   const [usersList, setUsersList] = useState<UserType[]>([]);
-  const [loading, setLoading] = useState(true);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [newUserData, setNewUserData] = useState({ full_name: '', institutional_email: '', role: 'standard_user', matric_or_staff_id: '', password: '' });
@@ -34,12 +33,10 @@ export function AdminUsersPage() {
   }, []);
 
   const fetchUsers = async () => {
-    setLoading(true);
     const res = await usersAPI.getAll();
     if (res.success && res.data?.users) {
       setUsersList(res.data.users);
     }
-    setLoading(false);
   };
 
   const handleAddUser = async (e: React.FormEvent) => {

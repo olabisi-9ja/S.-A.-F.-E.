@@ -11,7 +11,7 @@ interface ChatMessage {
 }
 
 // Ensure SpeechRecognition is available for TS
-const SpeechRecognitionAPI = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
+const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
 export function AiChatbot() {
   const [isOpen, setIsOpen] = useState(false);

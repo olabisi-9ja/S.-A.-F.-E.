@@ -34,7 +34,7 @@ export function AlertsPage() {
                 <div>
                   <p className="font-semibold text-gray-900">{a.user_name}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {a.created_at || a.timestamp ? new Date(a.created_at || a.timestamp).toLocaleString() : 'Just now'}
+                    {a.created_at ? new Date(a.created_at).toLocaleString() : 'Just now'}
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">

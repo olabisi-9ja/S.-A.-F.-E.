@@ -1,7 +1,5 @@
 import { MapPin, Radio, AlertTriangle, ArrowLeft, Navigation } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { AdminLayout } from '../../components/layout/AdminLayout';
-import { useAuth } from '../../context/AuthContext';
 import 'leaflet/dist/leaflet.css';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
