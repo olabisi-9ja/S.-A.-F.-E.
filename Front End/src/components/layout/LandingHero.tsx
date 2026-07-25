@@ -1,6 +1,4 @@
-import React from 'react';
 import { ArrowRight, Shield, Zap } from 'lucide-react';
-import { cn } from '../../utils/cn'; // Assume we have a cn utility
 
 interface LandingHeroProps {
   onNavigate: (path: string) => void;

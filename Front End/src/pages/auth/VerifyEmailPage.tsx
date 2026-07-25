@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Shield, CheckCircle, XCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
