@@ -12,7 +12,8 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "S.A.F.E. needs your location to send emergency alerts to campus security.",
         "NSBluetoothAlwaysUsageDescription": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback).",
-        "NSBluetoothPeripheralUsageDescription": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback)."
+        "NSBluetoothPeripheralUsageDescription": "S.A.F.E. uses Bluetooth to relay emergency alerts to nearby devices when the internet is unavailable (Mesh fallback).",
+        "NSMicrophoneUsageDescription": "S.A.F.E. needs access to your microphone to record audio for incident reports."
       },
       "config": {
         "googleMapsApiKey": "AIzaSyCfs7QR-WdPGscNXZPG_nmH_9R65DX71q8"
@@ -33,7 +34,8 @@
         "BLUETOOTH_SCAN",
         "BLUETOOTH_ADVERTISE",
         "BLUETOOTH_CONNECT",
-        "POST_NOTIFICATIONS"
+        "POST_NOTIFICATIONS",
+        "RECORD_AUDIO"
       ],
       "config": {
         "googleMaps": {
@@ -81,6 +83,12 @@
         {
           "photosPermission": "S.A.F.E. needs access to your photos to attach media to reports.",
           "cameraPermission": "S.A.F.E. needs access to your camera to attach photos to reports."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "S.A.F.E. needs access to your microphone to record audio for incident reports."
         }
       ]
     ],

@@ -10,6 +10,7 @@
     "crypto-js": "^4.2.0",
     "expo": "~57.0.1",
     "expo-auth-session": "^57.0.5",
+    "expo-av": "^16.0.8",
     "expo-constants": "~57.0.2",
     "expo-crypto": "^57.0.1",
     "expo-device": "~57.0.0",

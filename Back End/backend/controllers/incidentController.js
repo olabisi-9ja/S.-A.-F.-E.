@@ -178,7 +178,7 @@ export const previewClassification = async (req, res) => {
 
 export const createIncident = async (req, res) => {
   try {
-    const { category, description, latitude, longitude, media_url } = req.body;
+    const { category, description, latitude, longitude, media_url, audio_url } = req.body;
 
     if (!category || !description || !latitude || !longitude) {
       return res.status(400).json({ 
@@ -207,6 +207,7 @@ export const createIncident = async (req, res) => {
       latitude,
       longitude,
       media_url: media_url || null,
+      audio_url: audio_url || null,
       ...aiResult,
     });
 

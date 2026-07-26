@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { incidentsAPI } from '@/services/api';
 
 interface AIClassification {
@@ -16,6 +17,9 @@ export default function ReportScreen() {
   const [incidentType, setIncidentType] = useState('');
   const [loading, setLoading] = useState(false);
   const [mediaUri, setMediaUri] = useState<string | null>(null);
+  
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
 
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResult, setAiResult] = useState<AIClassification | null>(null);
@@ -33,6 +37,31 @@ export default function ReportScreen() {
     if (!result.canceled) {
       setMediaUri(result.assets[0].uri);
     }
+  };
+
+  const startRecording = async () => {
+    try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+    } catch (err) {
+      Alert.alert('Recording Failed', 'Failed to start recording.');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+    setRecording(null);
+    await recording.stopAndUnloadAsync();
+    await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+    const uri = recording.getURI();
+    setAudioUri(uri);
   };
 
   const handleAnalyze = async () => {
@@ -222,6 +251,16 @@ export default function ReportScreen() {
         <Ionicons name="camera" size={24} color="#4b5563" />
         <Text style={styles.cameraText}>
           {mediaUri ? 'Media Attached (Tap to change)' : 'Attach Photo / Video'}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity 
+        style={[styles.cameraButton, recording && { borderColor: '#ef4444', backgroundColor: '#fef2f2' }]} 
+        onPress={recording ? stopRecording : (audioUri ? () => setAudioUri(null) : startRecording)}
+      >
+        <Ionicons name={recording ? "stop-circle" : "mic"} size={24} color={recording ? "#ef4444" : "#4b5563"} />
+        <Text style={[styles.cameraText, recording && { color: '#ef4444' }]}>
+          {recording ? 'Recording... Tap to stop' : (audioUri ? 'Audio Attached (Tap to remove)' : 'Record Audio Note')}
         </Text>
       </TouchableOpacity>
 

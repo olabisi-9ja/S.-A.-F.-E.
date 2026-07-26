@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, FlatList, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, FlatList, RefreshControl, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { alertsAPI, incidentsAPI } from '@/services/api';
@@ -243,6 +243,31 @@ export default function HomeScreen() {
                   <Ionicons name="shield-checkmark" size={24} color="#4338ca" />
                 </View>
                 <Text style={styles.actionText}>Security</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Speed Dials */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Speed Dials</Text>
+            <View style={styles.gridContainer}>
+              <TouchableOpacity style={styles.actionCard} onPress={() => Linking.openURL('tel:112')}>
+                <View style={[styles.iconBox, { backgroundColor: '#fee2e2' }]}>
+                  <Ionicons name="call" size={24} color="#b91c1c" />
+                </View>
+                <Text style={styles.actionText}>Police</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionCard} onPress={() => Linking.openURL('tel:911')}>
+                <View style={[styles.iconBox, { backgroundColor: '#fef3c7' }]}>
+                  <Ionicons name="medkit" size={24} color="#d97706" />
+                </View>
+                <Text style={styles.actionText}>Ambulance</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.actionCard} onPress={() => Linking.openURL('tel:0800000000')}>
+                <View style={[styles.iconBox, { backgroundColor: '#e0e7ff' }]}>
+                  <Ionicons name="shield" size={24} color="#4338ca" />
+                </View>
+                <Text style={styles.actionText}>Campus Sec</Text>
               </TouchableOpacity>
             </View>
           </View>

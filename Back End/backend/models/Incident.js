@@ -67,6 +67,10 @@ const Incident = sequelize.define('Incident', {
     type: DataTypes.STRING(500),
     allowNull: true,
   },
+  audio_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
   resolution_notes: {
     type: DataTypes.TEXT,
     allowNull: true,

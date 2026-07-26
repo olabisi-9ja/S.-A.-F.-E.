@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AlertTriangle, FileText, MessageSquare, Clock, Zap, Radio, CheckCircle } from 'lucide-react';
+import { AlertTriangle, FileText, MessageSquare, Clock, Zap, Radio, CheckCircle, Phone, Shield, Heart } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -146,6 +146,40 @@ export function HomePage({ onNavigate }: HomePageProps) {
             </div>
             <span className="text-sm font-semibold">My Reports</span>
           </button>
+        </div>
+
+        {/* Speed Dials */}
+        <div>
+          <h3 className="font-semibold text-gray-800 mb-3">Speed Dials</h3>
+          <div className="grid grid-cols-3 gap-3">
+            <a
+              href="tel:112"
+              className="flex flex-col items-center gap-2 p-3 bg-white border border-gray-200 rounded-xl hover:border-red-300 hover:shadow-md transition text-gray-700 group text-decoration-none"
+            >
+              <div className="w-10 h-10 rounded-full bg-red-50 group-hover:bg-red-100 flex items-center justify-center transition">
+                <Phone className="w-5 h-5 text-red-600" />
+              </div>
+              <span className="text-xs font-semibold">Police</span>
+            </a>
+            <a
+              href="tel:911"
+              className="flex flex-col items-center gap-2 p-3 bg-white border border-gray-200 rounded-xl hover:border-orange-300 hover:shadow-md transition text-gray-700 group text-decoration-none"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-50 group-hover:bg-orange-100 flex items-center justify-center transition">
+                <Heart className="w-5 h-5 text-orange-600" />
+              </div>
+              <span className="text-xs font-semibold">Ambulance</span>
+            </a>
+            <a
+              href="tel:0800000000"
+              className="flex flex-col items-center gap-2 p-3 bg-white border border-gray-200 rounded-xl hover:border-indigo-300 hover:shadow-md transition text-gray-700 group text-decoration-none"
+            >
+              <div className="w-10 h-10 rounded-full bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition">
+                <Shield className="w-5 h-5 text-indigo-600" />
+              </div>
+              <span className="text-xs font-semibold">Campus Sec</span>
+            </a>
+          </div>
         </div>
 
         {/* Recent reports */}

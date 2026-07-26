@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { MapPin, Paperclip, Send, Brain, ChevronDown, AlertTriangle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { MapPin, Paperclip, Send, Brain, ChevronDown, AlertTriangle, Mic, Square } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
@@ -29,6 +29,45 @@ export function ReportPage({ onNavigate }: ReportPageProps) {
   const [aiResult, setAiResult] = useState<{ category: string; score: number } | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+
+  const [recording, setRecording] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setRecording(true);
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      setError('Microphone access denied or unavailable.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop();
+      setRecording(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -200,10 +239,26 @@ export function ReportPage({ onNavigate }: ReportPageProps) {
             GPS location will be automatically attached
           </div>
 
-          {/* Attachment note */}
-          <div className="flex items-center gap-2 text-xs text-gray-400">
-            <Paperclip className="w-4 h-4" />
-            Photo/video attachments supported on mobile
+          {/* Audio Recording */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-800 mb-1.5">Attach Voice Note (Web)</label>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={recording ? stopRecording : startRecording}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition ${
+                  recording 
+                    ? 'border-red-500 bg-red-50 text-red-700 hover:bg-red-100' 
+                    : audioBlob 
+                      ? 'border-green-500 bg-green-50 text-green-700 hover:bg-green-100'
+                      : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {recording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {recording ? 'Stop Recording' : audioBlob ? 'Audio Attached (Click to Re-record)' : 'Record Audio'}
+              </button>
+              {recording && <span className="text-xs text-red-600 animate-pulse font-medium">Recording...</span>}
+            </div>
           </div>
 
           {error && (
