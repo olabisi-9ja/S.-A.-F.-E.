@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { MapPin, Paperclip, Send, Brain, ChevronDown, AlertTriangle, Mic, Square } from 'lucide-react';
+import { MapPin, Send, Brain, ChevronDown, AlertTriangle, Mic, Square } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { Button } from '../../components/ui/Button';
