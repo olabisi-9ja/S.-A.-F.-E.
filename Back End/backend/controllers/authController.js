@@ -51,7 +51,7 @@ export const register = async (req, res) => {
       matric_or_staff_id: matric_or_staff_id || null,
       role: 'standard_user',
       verification_token: verificationToken,
-      email_verified: true, // Auto-verify email by default for easier demo/testing
+      email_verified: false, // Enforce email verification
     });
 
     // Send email asynchronously in the background so registration is fast and doesn't hang if SMTP times out

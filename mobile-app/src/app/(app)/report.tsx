@@ -453,3 +453,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return (
+    <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+      <Ionicons name="warning" size={48} color="#ef4444" style={{ marginBottom: 16 }} />
+      <Text style={[styles.title, { marginBottom: 8 }]}>Oops!</Text>
+      <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: 24 }]}>{error.message || 'Something went wrong while loading this screen.'}</Text>
+      <TouchableOpacity style={styles.submitButton} onPress={retry}>
+        <Text style={styles.submitButtonText}>Try Again</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}

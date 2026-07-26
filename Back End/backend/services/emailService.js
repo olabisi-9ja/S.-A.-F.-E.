@@ -19,7 +19,7 @@ export const sendVerificationEmail = async (to, token) => {
   const verificationUrl = `${frontendUrl}/auth/verify?token=${token}`;
   
   // Mock if not configured for production
-  if (!process.env.SMTP_USER || process.env.SMTP_USER === 'test' || process.env.SMTP_USER === 'placeholder') {
+  if (!process.env.SMTP_USER || process.env.SMTP_USER === 'test' || process.env.SMTP_USER === 'placeholder' || process.env.SMTP_PASS === 'YOUR_RESEND_API_KEY') {
     logger.warn(`SMTP not configured. Mocking verification email to ${to}. Token: ${token}`);
     return { success: true, mocked: true };
   }

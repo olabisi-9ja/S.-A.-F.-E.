@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, Animated, FlatList, Re
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { alertsAPI, incidentsAPI } from '@/services/api';
-import { sendAlertWithFallback } from '@/services/mesh';
+import { sendAlertWithFallback, getQueuedPacketCount, syncQueuedPackets } from '@/services/mesh';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'expo-router';
 
@@ -16,15 +16,18 @@ export default function HomeScreen() {
   const [recentAlerts, setRecentAlerts] = useState<any[]>([]);
   const [recentIncidents, setRecentIncidents] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [queuedPackets, setQueuedPackets] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
-      const [alertsRes, incidentsRes] = await Promise.all([
+      const [alertsRes, incidentsRes, meshCount] = await Promise.all([
         alertsAPI.getAll({ limit: 3 }),
         incidentsAPI.getAll({ limit: 3 }),
+        getQueuedPacketCount(),
       ]);
       if (alertsRes.success && alertsRes.data?.alerts) setRecentAlerts(alertsRes.data.alerts);
       if (incidentsRes.success && incidentsRes.data?.incidents) setRecentIncidents(incidentsRes.data.incidents);
+      setQueuedPackets(meshCount);
     } catch (e) {
       // Silently fail — data will just be empty
     }
@@ -82,6 +85,7 @@ export default function HomeScreen() {
     } catch (err) {
       Alert.alert('SOS Sent (Offline)', 'Your alert is queued and will deliver via mesh relay or SMS fallback.');
       setSosState('sent');
+      fetchData(); // Refresh to update queued packets count
     }
 
     setTimeout(() => setSosState('idle'), 4000);
@@ -125,6 +129,22 @@ export default function HomeScreen() {
         },
       ]
     );
+  };
+
+  const handleSyncMesh = async () => {
+    try {
+      const { synced, remaining } = await syncQueuedPackets();
+      if (synced > 0) {
+        Alert.alert('Mesh Synced', `Successfully synced ${synced} offline alerts to the server.`);
+      } else if (remaining > 0) {
+        Alert.alert('Sync Failed', 'Could not reach server to sync offline alerts. Please check your connection.');
+      } else {
+        Alert.alert('Mesh Queue Empty', 'All alerts have already been synced.');
+      }
+      fetchData();
+    } catch (e) {
+      Alert.alert('Sync Error', 'An error occurred while syncing.');
+    }
   };
 
   const formatTime = (dateStr: string) => {
@@ -193,6 +213,13 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </Animated.View>
             <Text style={styles.sosHint}>Press and hold for 1 second to trigger</Text>
+            
+            {queuedPackets > 0 && (
+              <TouchableOpacity style={styles.meshSyncButton} onPress={handleSyncMesh}>
+                <Ionicons name="cloud-upload" size={18} color="#d97706" />
+                <Text style={styles.meshSyncText}>{queuedPackets} offline alerts pending - Tap to Sync</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Quick Actions */}
@@ -340,6 +367,23 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontSize: 14,
     fontWeight: '500',
+  },
+  meshSyncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  meshSyncText: {
+    color: '#d97706',
+    fontWeight: 'bold',
+    marginLeft: 8,
+    fontSize: 14,
   },
   section: {
     marginTop: 24,
