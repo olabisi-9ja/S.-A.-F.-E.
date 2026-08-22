@@ -1,91 +1,358 @@
-import asyncio
-from fastapi import FastAPI
-from pydantic import BaseModel
-from transformers import pipeline
-import uvicorn
+"""
+S.A.F.E - standalone AI classification reference service.
+
+WHAT THIS IS
+------------
+A runnable, self-contained reference implementation of the S.A.F.E incident
+classifier. It mirrors the *production* classifier that lives inside the Node
+backend (``Back End/backend/controllers/incidentController.js`` -> classifyIncident).
+
+PRODUCTION DOES NOT CALL THIS SERVICE. Classification in the live system runs
+inside the Node backend via the Google Gemini API. This file exists so the
+design can be inspected, demoed, and evaluated in isolation (e.g. run it over a
+labelled eval set to measure accuracy / F1).
+
+DESIGN (honest and defensible - matches the thesis)
+---------------------------------------------------
+1. A hosted LLM (Google Gemini) classifies the free-text report into ONE
+   canonical category AND extracts structured severity SIGNALS from the text
+   (weapon present, injury, life-threatening, ongoing, etc.).
+2. The severity SCORE is NOT an arbitrary number from the model. It is computed
+   deterministically from a published rubric (SEVERITY_BASE + SIGNAL_DELTA).
+   The model only extracts factual signals; the arithmetic is fixed and auditable.
+3. The category is normalised to the canonical list shared with the clients.
+4. AI never gates an emergency (SOS). Classification applies to incident REPORTS
+   only, for additive triage. See the SOS safety guarantee in alertController.js.
+
+NOTE: An earlier version of this file used a DistilBERT zero-shot (NLI) pipeline
+with a hardcoded severity lookup table nudged by model confidence. That approach
+was replaced because (a) zero-shot entailment is markedly less accurate than a
+definition + few-shot prompted LLM, and (b) a confidence-nudged lookup table does
+not measure anything about the actual incident. The rubric below fixes both.
+
+Keep CATEGORIES / CATEGORY_DEFINITIONS / SEVERITY_BASE / SIGNAL_DELTA / FEWSHOT
+in sync with incidentController.js.
+"""
+
+import json
 import logging
+import os
+import re
+from typing import Any, Dict, Optional
+
+try:
+    import uvicorn
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    HAVE_FASTAPI = True
+except ImportError:  # web deps are optional -> allows importing this module as a
+    # library (e.g. for evaluation via eval/run_eval.py) without FastAPI installed.
+    uvicorn = None
+    HAVE_FASTAPI = False
+
+    class BaseModel:  # type: ignore
+        pass
+
+    class FastAPI:  # type: ignore - never instantiated when HAVE_FASTAPI is False
+        pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="S.A.F.E AI Classification Service")
-
-# Initialize the pipeline globally so it loads on startup
-logger.info("Loading DistilBERT zero-shot classification model...")
-try:
-    # Use a smaller model for faster downloads and lower memory footprint on prototype
-    classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
-    logger.info("Model loaded successfully.")
-except Exception as e:
-    logger.error(f"Error loading model: {e}")
-    classifier = None
-
-class IncidentRequest(BaseModel):
-    text: str
-
-class IncidentResponse(BaseModel):
-    category: str
-    severity_score: int
-    is_suspicious: bool
-
-CANDIDATE_LABELS = [
-    "Assault",
+# Canonical category list - MUST match the client dropdown and incidentController.js.
+CATEGORIES = [
     "Theft",
+    "Assault",
     "Harassment",
     "Vandalism",
-    "Fire",
+    "Suspicious Activity",
+    "Cultism",
+    "Armed Robbery",
     "Emergency / Medical",
-    "Suspicious Activity"
+    "Fire",
+    "Other",
 ]
 
-SEVERITY_WEIGHTS = {
-    "Fire": 95,
-    "Emergency / Medical": 90,
-    "Assault": 85,
-    "Theft": 75,
-    "Harassment": 70,
-    "Suspicious Activity": 55,
-    "Vandalism": 45
+CATEGORY_DEFINITIONS = [
+    ("- Theft", "Property taken without force or threat (phone/laptop stolen from an unattended spot, pickpocketing, snatch-and-run)."),
+    ("- Armed Robbery", "Property taken using a weapon or the threat of one (gun, knife, machete, acid). Use this INSTEAD of Theft when a weapon is involved."),
+    ("- Assault", "Physical attack, beating, fighting, or use of physical force against a person."),
+    ("- Harassment", "Threats, intimidation, bullying, stalking, sexual harassment, or verbal abuse where physical contact has not (yet) occurred."),
+    ("- Vandalism", "Deliberate damage to property (broken window, slashed tyre, defaced wall). No person harmed."),
+    ("- Suspicious Activity", "A person or situation that seems wrong but NO crime has clearly happened yet (lurking, tailing someone, unattended bag)."),
+    ("- Cultism", "Cult / gang / confraternity activity, initiation, clashes, or related threats."),
+    ("- Emergency / Medical", "Medical emergency: someone hurt, unwell, fainted, unconscious, an accident, or anything needing first aid or an ambulance."),
+    ("- Fire", "Fire, smoke, explosion, or a real risk of fire."),
+    ("- Other", "Anything that does not fit the categories above."),
+]
+
+# Base severity per category; adjusted by the extracted signals below.
+SEVERITY_BASE = {
+    "Armed Robbery": 82,
+    "Fire": 80,
+    "Emergency / Medical": 72,
+    "Assault": 70,
+    "Cultism": 68,
+    "Harassment": 50,
+    "Theft": 45,
+    "Vandalism": 35,
+    "Other": 35,
+    "Suspicious Activity": 30,
 }
 
-@app.post("/classify", response_model=IncidentResponse)
-async def classify_incident(request: IncidentRequest):
-    if not classifier:
-        return IncidentResponse(
-            category="General",
-            severity_score=50,
-            is_suspicious=False
-        )
+# Published, deterministic severity rubric. The model only sets the booleans;
+# the final score is computed from this table, so it is reproducible.
+SIGNAL_DELTA = {
+    "life_threatening": 18,  # imminent danger to life
+    "weapon_involved": 15,   # a weapon is mentioned/present
+    "injury_reported": 10,   # a person is reported hurt/injured/bleeding
+    "ongoing_now": 10,       # incident happening now / suspect still on scene
+    "multiple_victims": 8,   # more than one person affected/targeted
+    "property_loss": 5,      # valuables stolen or property damaged/lost
+    "resolved_past": -12,    # event is over; suspect gone; no current danger
+}
 
-    text = request.text
-    
-    # Run zero-shot classification
-    # Run in threadpool as pipeline call is blocking
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, lambda: classifier(text, CANDIDATE_LABELS))
-    
-    # Get the top predicted category
-    top_category = result["labels"][0]
-    confidence = result["scores"][0]
-    
-    # Calculate severity based on category weight and confidence
-    base_severity = SEVERITY_WEIGHTS.get(top_category, 50)
-    
-    # Adjust severity slightly based on model confidence
-    # If confidence is very high, it bumps up slightly. 
-    severity_score = int(base_severity * (0.8 + (0.2 * confidence)))
-    
-    # Cap at 100
-    severity_score = min(100, max(0, severity_score))
-    
-    # Determine if suspicious (low confidence or specifically flagged)
-    is_suspicious = top_category == "Suspicious Activity" or confidence < 0.3
-    
-    return IncidentResponse(
-        category=top_category,
-        severity_score=severity_score,
-        is_suspicious=is_suspicious
-    )
+SIGNAL_KEYS = list(SIGNAL_DELTA.keys())
+
+# Few-shot examples - Nigerian campus phrasing. ~2 per category: (report, category, signals).
+FEWSHOT = [
+    ("Two boys on a bike just snatched my phone near the faculty gate and rode off.", "Theft", {"ongoing_now": True, "property_loss": True}),
+    ("I left my laptop in the reading room and when I came back it was gone.", "Theft", {"resolved_past": True, "property_loss": True}),
+    ("Some guys beat up a student behind the hostel, he is bleeding from the nose.", "Assault", {"injury_reported": True, "ongoing_now": True}),
+    ("There was a fist fight between two students in the cafeteria; security came and it is over now.", "Assault", {"resolved_past": True}),
+    ("A senior student keeps sending threatening messages and waits outside my class to intimidate me.", "Harassment", {"ongoing_now": True}),
+    ("A lecturer is threatening to fail me if I do not visit his office alone.", "Harassment", {"ongoing_now": True}),
+    ("The window of the lab was smashed overnight, nothing was stolen.", "Vandalism", {"property_loss": True, "resolved_past": True}),
+    ("Someone keyed my car and slashed two tyres in the car park.", "Vandalism", {"property_loss": True, "resolved_past": True}),
+    ("A man I do not recognize is lingering near the female hostel taking photos of students.", "Suspicious Activity", {"ongoing_now": True}),
+    ("There is an unattended bag sitting in the lecture hall that nobody claims.", "Suspicious Activity", {"ongoing_now": True}),
+    ("A group wearing black is gathering at the back gate shouting confraternity slogans.", "Cultism", {"ongoing_now": True, "multiple_victims": True}),
+    ("We found cult initiation materials and a threatening note in the classroom.", "Cultism", {"resolved_past": True}),
+    ("Three men with guns robbed students at the campus gate and took their phones and money.", "Armed Robbery", {"weapon_involved": True, "multiple_victims": True, "property_loss": True, "resolved_past": True}),
+    ("A guy pulled a knife on me and collected my bag near the bus park.", "Armed Robbery", {"weapon_involved": True, "property_loss": True, "resolved_past": True}),
+    ("A student just collapsed in the exam hall and is not responding, we need an ambulance.", "Emergency / Medical", {"life_threatening": True, "injury_reported": True, "ongoing_now": True}),
+    ("Someone fell down the stairs and twisted her ankle, she cannot walk.", "Emergency / Medical", {"injury_reported": True, "ongoing_now": True}),
+    ("Smoke is coming from the chemistry lab and we can see flames, everyone is running out.", "Fire", {"life_threatening": True, "ongoing_now": True, "multiple_victims": True}),
+    ("A small bin caught fire outside the hostel but we put it out with water.", "Fire", {"resolved_past": True}),
+    ("The street light at the male hostel has been broken for weeks, it is very dark at night.", "Other", {}),
+    ("I lost my ID card somewhere between the library and the admin block.", "Other", {"property_loss": True, "resolved_past": True}),
+]
+
+
+def normalize_category(raw: Optional[str]) -> str:
+    if not raw:
+        return "Other"
+    c = str(raw).strip()
+    if c in CATEGORIES:
+        return c
+    lc = c.lower()
+    aliases = {
+        "medical": "Emergency / Medical",
+        "emergency": "Emergency / Medical",
+        "emergency / medical": "Emergency / Medical",
+        "emergency/medical": "Emergency / Medical",
+        "robbery": "Armed Robbery",
+        "armed robbery": "Armed Robbery",
+        "armed-robbery": "Armed Robbery",
+        "suspicious": "Suspicious Activity",
+        "suspicious activity": "Suspicious Activity",
+        "general": "Other",
+    }
+    if lc in aliases:
+        return aliases[lc]
+    for cat in CATEGORIES:
+        if lc in cat.lower():
+            return cat
+    if any(k in lc for k in ("medic", "injur", "faint", "ambulance", "unconscious")):
+        return "Emergency / Medical"
+    if any(k in lc for k in ("weapon", "gun", "robber", "knife", "machete")):
+        return "Armed Robbery"
+    return "Other"
+
+
+def compute_severity(category: str, signals: Optional[Dict[str, bool]] = None) -> int:
+    signals = signals or {}
+    score = SEVERITY_BASE.get(category, 35)
+    for key in SIGNAL_KEYS:
+        if signals.get(key):
+            score += SIGNAL_DELTA[key]
+    return max(0, min(100, round(score)))
+
+
+def build_prompt(description: str) -> str:
+    defs = "\n".join(f"{k}: {v}" for k, v in CATEGORY_DEFINITIONS)
+    examples = []
+    for text, cat, sig in FEWSHOT:
+        sig_str = ", ".join(f"{k}={'true' if sig.get(k) else 'false'}" for k in SIGNAL_KEYS)
+        examples.append(f'Report: "{text}"\nCategory: {cat}\nSignals: {sig_str}')
+    examples_block = "\n\n".join(examples)
+    safe_desc = description.replace('"', '\\"')
+    return f"""You are a triage assistant for a Nigerian university (KWASU) campus safety system.
+Given an incident report you must do TWO things:
+1. Classify it into exactly ONE category from the list below.
+2. Extract structured severity SIGNALS that are explicitly supported by the text.
+
+Categories and definitions:
+{defs}
+
+Signals to extract (each true/false, based ONLY on what the text says; if unclear, false):
+- weapon_involved: a weapon is mentioned or present (gun, knife, machete, acid, club, broken bottle).
+- life_threatening: imminent danger to life (unconscious / not breathing, severe bleeding, active shooter, fire spreading, someone trapped).
+- injury_reported: a person is reported hurt, injured, or bleeding.
+- ongoing_now: the incident is happening right now / suspect is still on the scene.
+- multiple_victims: more than one person is affected or targeted.
+- property_loss: valuables were stolen or property was damaged or lost.
+- resolved_past: the event is already over and there is no current danger (suspect fled, clearly past tense).
+
+Rules:
+- Choose the single best-fitting category using the definitions. In particular: Armed Robbery (not Theft) when a weapon is involved; Suspicious Activity only when no crime has clearly occurred yet.
+- Extract signals strictly from the text. Do not infer beyond what is written.
+- Set is_suspicious true if the report describes something ambiguous, possibly criminal, or warranting a patrol check.
+- confidence reflects how clearly the text maps to the chosen category (high / medium / low).
+
+Respond ONLY with a JSON object of this shape:
+{{"category": str, "confidence": "high|medium|low", "signals": {{"weapon_involved": bool, "life_threatening": bool, "injury_reported": bool, "ongoing_now": bool, "multiple_victims": bool, "property_loss": bool, "resolved_past": bool}}, "is_suspicious": bool, "reasoning": str}}
+
+Examples:
+{examples_block}
+
+Now classify this report:
+Report: "{safe_desc}\""""
+
+
+def _parse_json_loose(text: str) -> Optional[Dict[str, Any]]:
+    if not text:
+        return None
+    t = re.sub(r"```json|```", "", text, flags=re.IGNORECASE).strip()
+    start, end = t.find("{"), t.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        t = t[start:end + 1]
+    try:
+        return json.loads(t)
+    except json.JSONDecodeError:
+        return None
+
+
+def classify_by_keywords(description: str) -> Dict[str, Any]:
+    """Rubric-based keyword fallback used when GEMINI_API_KEY is unset or the call fails."""
+    d = (description or "").lower()
+
+    def has(*words):
+        return any(w in d for w in words)
+
+    signals = {
+        "weapon_involved": has("gun", "knife", "machete", "cutlass", "acid", "pistol", "weapon", "armed"),
+        "life_threatening": has("unconscious", "not breathing", "severe bleeding", "dying", "collapsed", "spreading fire", "trapped"),
+        "injury_reported": has("hurt", "injur", "bleed", "wound", "faint", "collapsed", "beat up", "attacked"),
+        "ongoing_now": has("just now", "right now", "ongoing", "at the moment", "still here", "is happening", "right there"),
+        "multiple_victims": has("students", "group", "crowd", "people", "they ", "them", "several"),
+        "property_loss": has("stolen", "snatched", "robbed", "took", "collected", "missing", "lost", "broke", "damaged", "smashed", "slashed"),
+        "resolved_past": has("yesterday", "earlier", "last night", "was stolen", "happened", "already", "over now", "fled", "ran off", "gone"),
+    }
+
+    category = "Other"
+    if has("fire", "smoke", "flame", "burn"):
+        category = "Fire"
+    elif signals["weapon_involved"] and (signals["property_loss"] or "rob" in d):
+        category = "Armed Robbery"
+    elif has("assault", "attack", "fight", "beat"):
+        category = "Assault"
+    elif has("harass", "threaten", "intimidat", "stalk", "bully"):
+        category = "Harassment"
+    elif has("cult", "confratern", "gang", "initiation"):
+        category = "Cultism"
+    elif has("medic", "injur", "faint", "collapsed", "ambulance", "unconscious", "sick", "accident"):
+        category = "Emergency / Medical"
+    elif has("vandal", "damage", "smashed", "defac", "slashed", "keyed"):
+        category = "Vandalism"
+    elif has("theft", "stolen", "snatched", "robbed", "missing", "lost"):
+        category = "Theft"
+    elif has("suspicious", "lurking", "following", "tailing", "unattended"):
+        category = "Suspicious Activity"
+
+    return {
+        "category": category,
+        "severity_score": compute_severity(category, signals),
+        "is_suspicious": category == "Suspicious Activity",
+        "confidence": "low",
+        "signals": signals,
+        "reasoning": "Keyword + rubric fallback (LLM unavailable).",
+    }
+
+
+def classify_incident(description: str) -> Dict[str, Any]:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key or api_key == "placeholder":
+        return classify_by_keywords(description)
+
+    try:
+        from google import genai  # imported lazily so the module loads without the SDK installed
+    except ImportError:
+        logger.warning("google-genai not installed; using keyword + rubric fallback.")
+        return classify_by_keywords(description)
+
+    try:
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=build_prompt(description),
+            config={"temperature": 0.2, "response_mime_type": "application/json"},
+        )
+        parsed = _parse_json_loose(getattr(response, "text", ""))
+    except Exception as e:  # pragma: no cover - network / auth errors
+        logger.warning("Gemini classification failed, using keyword + rubric fallback: %s", e)
+        return classify_by_keywords(description)
+
+    if not parsed:
+        return classify_by_keywords(description)
+
+    signals = parsed.get("signals") or {}
+    category = normalize_category(parsed.get("category"))
+    confidence = parsed.get("confidence") or "medium"
+    is_suspicious = bool(parsed.get("is_suspicious")) or category == "Suspicious Activity" or confidence == "low"
+
+    return {
+        "category": category,
+        "severity_score": compute_severity(category, signals),
+        "is_suspicious": is_suspicious,
+        "confidence": confidence,
+        "signals": signals,
+        "reasoning": parsed.get("reasoning") or "",
+    }
+
+
+# --------------------------------------------------------------------------- #
+# FastAPI surface (optional - only for local demos). Production does not use it.
+# Guarded so this module can ALSO be imported as a library (e.g. by
+# eval/run_eval.py) without FastAPI/uvicorn installed.
+# --------------------------------------------------------------------------- #
+if HAVE_FASTAPI:
+    app = FastAPI(title="S.A.F.E AI Classification Service (reference)")
+
+    class IncidentRequest(BaseModel):
+        text: str
+
+    class IncidentResponse(BaseModel):
+        category: str
+        severity_score: int
+        is_suspicious: bool
+        confidence: str = "medium"
+        signals: Dict[str, bool] = {}
+        reasoning: str = ""
+
+    @app.post("/classify", response_model=IncidentResponse)
+    async def classify_incident_endpoint(request: IncidentRequest) -> IncidentResponse:
+        result = classify_incident(request.text)
+        return IncidentResponse(**result)
+
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import sys
+
+    if len(sys.argv) > 1:
+        # CLI: python main.py "some incident text"
+        print(json.dumps(classify_incident(" ".join(sys.argv[1:])), indent=2))
+    elif uvicorn is not None:
+        uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    else:
+        print("uvicorn not installed; pass an incident text as an argument to classify it.")

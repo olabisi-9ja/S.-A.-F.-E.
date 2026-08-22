@@ -1,0 +1,120 @@
+{"text": "Someone took my phone from my bag while I was sleeping in the common room.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "I cannot find my power bank; it was stolen at the lecture theatre yesterday.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "My wallet was picked from my pocket in the crowd at the bus park.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Two girls snatched my handbag and ran towards the gate.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "My bicycle was stolen from the rack outside the engineering block overnight.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "A student took my charger from the socket when I stepped out briefly.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "My bag with my laptop inside is missing from the library table.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Pickpockets are operating around the market gate; they got my money.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "I left my earpod case on the desk and it is gone.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "My textbooks were taken from my locker; the lock was cut.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "A boy grabbed my phone from my hand at the ATM and disappeared into the crowd.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Someone stole my sunglasses from the car while I was buying food.", "category": "Theft", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Three boys with knives surrounded me at the junction and collected my phone and cash.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "A man pointed a gun at the okada man and snatched his bike.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "Armed men attacked students returning from night class and robbed them of their phones.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "I was robbed at cutlass point near the farm road; they took everything.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "Two guys with a gun and a machete hijacked a car at the campus entrance.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "A cultist flashed a pistol and collected my laptop bag by the fence.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "Robbers wielding broken bottles broke into the off-campus lodge and stole laptops.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "Someone held a knife to my neck and took my watch behind the chapel.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "Gunmen shot into the air and robbed the POS shop near the gate.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "life_threatening": true, "property_loss": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "A gang with axes ambushed a delivery rider and took the goods.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "They threatened me with acid and collected my phone and money at the bus stop.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "resolved_past": true}}
+{"text": "Machete-wielding thieves robbed students of their phones at the bypass last night.", "category": "Armed Robbery", "signals": {"weapon_involved": true, "property_loss": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "Two students are punching each other in the hostel corridor right now.", "category": "Assault", "signals": {"ongoing_now": true}}
+{"text": "A senior student slapped and pushed a fresher during orientation.", "category": "Assault", "signals": {"resolved_past": true}}
+{"text": "Some boys ganged up and beat a student bloody behind the sports complex.", "category": "Assault", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "A lecturer physically attacked a student who challenged him in class.", "category": "Assault", "signals": {"resolved_past": true}}
+{"text": "There is a brawl breaking out at the cafeteria; people are throwing chairs.", "category": "Assault", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "A group of boys assaulted a female student near the gate last night.", "category": "Assault", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "My roommate was attacked and pushed down the stairs; she is hurt.", "category": "Assault", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "A fight broke out between two rival groups after the match.", "category": "Assault", "signals": {"multiple_victims": true, "resolved_past": true}}
+{"text": "Someone threw a stone and hit a student during the protest.", "category": "Assault", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "Security guards beat up a student for no reason at the gate.", "category": "Assault", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "A player headbutted another during the football match.", "category": "Assault", "signals": {"resolved_past": true}}
+{"text": "A man is chasing and hitting a woman with his belt on the field right now.", "category": "Assault", "signals": {"ongoing_now": true}}
+{"text": "A lecturer keeps demanding sex in exchange for marks.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "Someone is sending me abusive and threatening messages every night.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "A group of boys stand at the gate every evening and catcall female students.", "category": "Harassment", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "My ex keeps showing up at my lectures and threatening to deal with me.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "A senior colleague keeps making unwanted advances and cornering me in the office.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "There are bullying posts about a fresher circulating in the class WhatsApp group.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "A student has been stalking me from the library to my hostel for two weeks.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "Someone left a threatening note on my desk warning me to drop the case.", "category": "Harassment", "signals": {}}
+{"text": "A boy keeps calling and threatening to beat me if I report him.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "Seniors are extorting money from year-one students by threatening them.", "category": "Harassment", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "A staff member makes inappropriate comments about my body every time I visit.", "category": "Harassment", "signals": {"ongoing_now": true}}
+{"text": "I keep receiving anonymous calls threatening to kidnap me.", "category": "Harassment", "signals": {"ongoing_now": true, "life_threatening": true}}
+{"text": "Unknown persons smashed the windscreen of my car in the car park.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "The laboratory windows were broken overnight.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Someone spray-painted rude words on the wall of the lecture hall.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Two tyres of the school bus were slashed.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "The ATM screen was smashed with a hammer by vandals.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Someone broke the benches at the garden pavilion.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "The notice board was ripped down and destroyed.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Graffiti was sprayed all over the new auditorium walls.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Unknown people pulled down the fence behind the hostel last night.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "The water pipes in the toilet were broken and water is everywhere.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Someone keyed the entire side of the dean's car.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Classroom desks were smashed and chairs thrown around over the weekend.", "category": "Vandalism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "A man I do not know is walking around the female hostel peeping into windows.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "There is an unclaimed bag sitting under the lecture-hall bench.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "A car with no plate has been parked near the gate with two men inside for an hour.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "Someone is taking photos of the security post and the CCTV cameras.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "A stranger is asking students for their personal details near the bursary.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "I keep seeing the same unfamiliar okada man circling the female hostel every night.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "There is a drone hovering over the female hostel compound.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "A man is trying the door handles of parked cars along the road.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "Two boys are loitering at the back fence looking like they are scouting.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "Someone followed me from the gate to my lodge without speaking, then left.", "category": "Suspicious Activity", "signals": {"resolved_past": true}}
+{"text": "An unattended gas cylinder was left at the cafeteria entrance.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "A person in a face mask is standing at the library exit watching students.", "category": "Suspicious Activity", "signals": {"ongoing_now": true}}
+{"text": "A group in black regalia is gathering at the back gate chanting; people are scared.", "category": "Cultism", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "We found a black beret, a cutlass and a threatening note in an empty classroom.", "category": "Cultism", "signals": {"weapon_involved": true, "resolved_past": true}}
+{"text": "Cult groups clashed near the bypass; we heard gunshots.", "category": "Cultism", "signals": {"weapon_involved": true, "life_threatening": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "A student received a leaflet with a red ribbon, a known cult initiation threat.", "category": "Cultism", "signals": {"resolved_past": true}}
+{"text": "There is word of a planned cult initiation at the abandoned building tonight.", "category": "Cultism", "signals": {"ongoing_now": true}}
+{"text": "Two rival confraternities are mobilizing on campus; tension is very high.", "category": "Cultism", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "A student was forced to join a cult and beaten when he refused; he is hospitalized.", "category": "Cultism", "signals": {"injury_reported": true, "resolved_past": true}}
+{"text": "Threatening cult slogans were painted on the faculty wall overnight.", "category": "Cultism", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "Students are fleeing the lecture theatre because cult members stormed in.", "category": "Cultism", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "A known cultist was seen distributing charms and recruiting freshers.", "category": "Cultism", "signals": {"ongoing_now": true, "multiple_victims": true}}
+{"text": "Gunmen suspected to be cultists opened fire at a student gathering.", "category": "Cultism", "signals": {"weapon_involved": true, "life_threatening": true, "multiple_victims": true, "resolved_past": true}}
+{"text": "We overheard cult members planning an attack on a rival group at the lodge.", "category": "Cultism", "signals": {"ongoing_now": true}}
+{"text": "A student fainted while standing in the assembly line.", "category": "Emergency / Medical", "signals": {"injury_reported": true, "ongoing_now": true}}
+{"text": "Someone is having a seizure in the library.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "A worker fell from the scaffolding and is not moving.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "A student is having an asthma attack and cannot find their inhaler.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "There has been a bike accident at the junction; the rider is bleeding.", "category": "Emergency / Medical", "signals": {"injury_reported": true, "ongoing_now": true}}
+{"text": "A pregnant student is in severe pain and needs help at the hostel.", "category": "Emergency / Medical", "signals": {"injury_reported": true, "ongoing_now": true}}
+{"text": "Someone touched a live wire and got an electric shock.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "A student collapsed in the exam hall and is unresponsive.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "A girl is having a severe allergic reaction and her face is swelling.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "An elderly cleaner slipped on the wet floor and hurt her hip.", "category": "Emergency / Medical", "signals": {"injury_reported": true, "ongoing_now": true}}
+{"text": "A student is diabetic and has gone into a low-sugar coma.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "Someone is complaining of crushing chest pain in the admin block.", "category": "Emergency / Medical", "signals": {"life_threatening": true, "injury_reported": true, "ongoing_now": true}}
+{"text": "Smoke is pouring out of the chemistry lab and we can see flames.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "multiple_victims": true}}
+{"text": "A dormitory mattress is burning in the corridor and the smoke is thick.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true}}
+{"text": "There is a small fire in the dustbin outside; it is spreading to the grass.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true}}
+{"text": "We smell gas and heard a small explosion in the kitchen.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true}}
+{"text": "Flames are coming from the generator house.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true}}
+{"text": "A bush fire is moving towards the male hostel from the farm.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "multiple_victims": true}}
+{"text": "The electrical panel is sparking and smoking.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true}}
+{"text": "A car is on fire in the car park near other vehicles.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "property_loss": true}}
+{"text": "Someone set the notice board on fire and it is spreading up the wall.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "property_loss": true}}
+{"text": "Fire has engulfed the kiosk at the gate and people are running.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "multiple_victims": true}}
+{"text": "There is smoke in the library but we cannot tell where it is from.", "category": "Fire", "signals": {"ongoing_now": true}}
+{"text": "The candle in the hostel room tipped over and the curtain is ablaze.", "category": "Fire", "signals": {"life_threatening": true, "ongoing_now": true, "property_loss": true}}
+{"text": "The street lights along the male hostel road have been out for a week.", "category": "Other", "signals": {}}
+{"text": "I lost my ID card between the library and the admin block.", "category": "Other", "signals": {"property_loss": true, "resolved_past": true}}
+{"text": "There is no water in the hostel taps again.", "category": "Other", "signals": {}}
+{"text": "The school bus broke down and is blocking the road.", "category": "Other", "signals": {"ongoing_now": true}}
+{"text": "Stray cattle are on the access road causing a traffic jam.", "category": "Other", "signals": {"ongoing_now": true}}
+{"text": "I found a lost child crying at the main gate.", "category": "Other", "signals": {"ongoing_now": true}}
+{"text": "The Wi-Fi router in my department has been down all day.", "category": "Other", "signals": {}}
+{"text": "The drainage is overflowing near the cafeteria after the rain.", "category": "Other", "signals": {}}
+{"text": "A tree branch fell and is blocking the walkway to the library.", "category": "Other", "signals": {"ongoing_now": true}}
+{"text": "The school intercom system is not working.", "category": "Other", "signals": {}}
+{"text": "There is broken glass littered on the basketball court.", "category": "Other", "signals": {}}
+{"text": "The elevator in the admin block is stuck with no one inside.", "category": "Other", "signals": {"ongoing_now": true}}

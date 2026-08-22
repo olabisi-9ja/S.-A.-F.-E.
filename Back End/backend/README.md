@@ -144,21 +144,44 @@ Authorization: Bearer <your_token>
 
 Tokens are obtained via `/api/auth/login` or `/api/auth/register`.
 
-## 📱 AI Integration
+## 🤖 AI Integration
 
-The backend integrates with a Python AI service for:
+Incident classification and severity scoring run **inside the Node backend** (no
+separate Python service is called at runtime). They are powered by the
+**Google Gemini** large language model (`gemini-2.5-flash`) plus a deterministic
+severity rubric:
 
-- **Incident Classification**: DistilBERT NLP model
-- **Severity Scoring**: 0-100 risk assessment
-- **Fake Report Detection**: Confidence-based flagging
+- **Incident Classification**: the LLM is prompted with category definitions and
+  a few labelled examples (few-shot), then returns one canonical category. The
+  result is normalised to the same category list used by the mobile/web clients.
+- **Severity Scoring (0–100)**: the LLM only *extracts factual signals* from the
+  text (weapon involved, injury, life-threatening, incident ongoing, multiple
+  victims, property loss, already resolved). The backend computes the score from
+  a published rubric (`SEVERITY_BASE` + `SIGNAL_DELTA`) in
+  `controllers/incidentController.js`, so the score is explainable and
+  reproducible — never an arbitrary model number.
+- **Suspicious / low-confidence flagging**: `ai_is_suspicious` is set for
+  suspicious activity or low model confidence.
+- **Potential-duplicate detection**: a second Gemini call compares a new report
+  against recent reports of the same category.
 
-Configure the AI service URL in `.env`:
+Configure the model with:
 
 ```env
-AI_SERVICE_URL=http://localhost:8000
+GEMINI_API_KEY=your_google_gemini_api_key
 ```
 
-If the AI service is unavailable, the backend falls back to keyword-based classification.
+If `GEMINI_API_KEY` is missing or the Gemini call fails, classification falls
+back to a **keyword + rubric** path that uses the same severity rubric, so
+incident reporting never fails and severity stays explainable.
+
+> **SOS safety guarantee:** AI never gates or delays an emergency alert. Every
+> SOS trigger is treated as highest priority and dispatched to security staff
+> immediately; AI is used only to add triage detail to incident *reports*. See
+> `controllers/alertController.js`.
+
+A standalone reference implementation of the same classifier (for demos and
+offline evaluation) lives in `ai_service/main.py`. Production does not depend on it.
 
 ## 📶 Mesh Networking
 
