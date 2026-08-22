@@ -40,9 +40,21 @@ import os
 import re
 from typing import Any, Dict, Optional
 
-import uvicorn
-from fastapi import FastAPI
-from pydantic import BaseModel
+try:
+    import uvicorn
+    from fastapi import FastAPI
+    from pydantic import BaseModel
+    HAVE_FASTAPI = True
+except ImportError:  # web deps are optional -> allows importing this module as a
+    # library (e.g. for evaluation via eval/run_eval.py) without FastAPI installed.
+    uvicorn = None
+    HAVE_FASTAPI = False
+
+    class BaseModel:  # type: ignore
+        pass
+
+    class FastAPI:  # type: ignore - never instantiated when HAVE_FASTAPI is False
+        pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -311,27 +323,27 @@ def classify_incident(description: str) -> Dict[str, Any]:
 
 # --------------------------------------------------------------------------- #
 # FastAPI surface (optional - only for local demos). Production does not use it.
+# Guarded so this module can ALSO be imported as a library (e.g. by
+# eval/run_eval.py) without FastAPI/uvicorn installed.
 # --------------------------------------------------------------------------- #
-app = FastAPI(title="S.A.F.E AI Classification Service (reference)")
+if HAVE_FASTAPI:
+    app = FastAPI(title="S.A.F.E AI Classification Service (reference)")
 
+    class IncidentRequest(BaseModel):
+        text: str
 
-class IncidentRequest(BaseModel):
-    text: str
+    class IncidentResponse(BaseModel):
+        category: str
+        severity_score: int
+        is_suspicious: bool
+        confidence: str = "medium"
+        signals: Dict[str, bool] = {}
+        reasoning: str = ""
 
-
-class IncidentResponse(BaseModel):
-    category: str
-    severity_score: int
-    is_suspicious: bool
-    confidence: str = "medium"
-    signals: Dict[str, bool] = {}
-    reasoning: str = ""
-
-
-@app.post("/classify", response_model=IncidentResponse)
-async def classify_incident_endpoint(request: IncidentRequest) -> IncidentResponse:
-    result = classify_incident(request.text)
-    return IncidentResponse(**result)
+    @app.post("/classify", response_model=IncidentResponse)
+    async def classify_incident_endpoint(request: IncidentRequest) -> IncidentResponse:
+        result = classify_incident(request.text)
+        return IncidentResponse(**result)
 
 
 if __name__ == "__main__":
@@ -340,5 +352,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         # CLI: python main.py "some incident text"
         print(json.dumps(classify_incident(" ".join(sys.argv[1:])), indent=2))
-    else:
+    elif uvicorn is not None:
         uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    else:
+        print("uvicorn not installed; pass an incident text as an argument to classify it.")
