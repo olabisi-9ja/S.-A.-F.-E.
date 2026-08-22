@@ -1,6 +1,10 @@
+# Standalone AI classification reference service.
+# Mirrors the production classifier in
+# Back End/backend/controllers/incidentController.js (Google Gemini + rubric).
+#
+# NOTE: production does NOT depend on this service. Incident classification runs
+# inside the Node backend. This file is for local demos and offline evaluation.
 fastapi
 uvicorn
 pydantic
-transformers
-torch
-tf-keras
+google-genai
