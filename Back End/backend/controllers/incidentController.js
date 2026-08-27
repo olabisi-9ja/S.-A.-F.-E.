@@ -66,30 +66,41 @@ const CATEGORY_DEFINITIONS = [
 ];
 
 // Base severity per category; adjusted by the extracted signals below.
+// Calibrated so that the CATEGORY ALONE already lands the incident in the
+// correct triage band (Low <40 / Moderate 40-59 / High 60-79 / Critical 80+),
+// matching the bands used by the web + mobile clients. That way an
+// under-extracted signal can never drag a serious crime into a low band.
 const SEVERITY_BASE = {
   'Armed Robbery': 82,
-  'Fire': 80,
+  'Fire': 82,
   'Emergency / Medical': 72,
-  'Assault': 70,
-  'Cultism': 68,
-  'Harassment': 50,
-  'Theft': 45,
-  'Vandalism': 35,
-  'Other': 35,
-  'Suspicious Activity': 30,
+  'Assault': 74,
+  'Cultism': 72,
+  'Harassment': 58,
+  'Theft': 56,
+  'Vandalism': 44,
+  'Suspicious Activity': 40,
+  'Other': 34,
 };
 
 // Published, deterministic severity rubric. The model only sets the booleans;
 // the final score is computed from this table, so it is reproducible and
 // auditable (not a black-box number).
+// Recalibrated after field reports of systematic UNDER-scoring:
+//   - resolved_past was -12: almost every campus report is past-tense
+//     ("my phone was stolen"), so nearly everything lost 12 points for
+//     recency alone. Severity should grade the INCIDENT, not the tense.
+//     Now -5: over-and-done still matters, but it no longer swamps the base.
+//   - life_threatening / injury / ongoing_now / weapon_involved raised so
+//     active, violent, weaponised situations clearly cross band boundaries.
 const SIGNAL_DELTA = {
-  life_threatening: 18, // imminent danger to life: unconscious/not breathing, severe bleeding, active shooter, spreading fire, trapped
-  weapon_involved: 15,  // a weapon is mentioned/present (gun, knife, machete, acid, club)
-  injury_reported: 10,  // a person is reported hurt/injured/bleeding
-  ongoing_now: 10,      // incident is happening now / suspect still on scene
+  life_threatening: 20, // imminent danger to life: unconscious/not breathing, severe bleeding, active shooter, spreading fire, trapped
+  weapon_involved: 14,  // a weapon is mentioned/present (gun, knife, machete, acid, club)
+  injury_reported: 12,  // a person is reported hurt/injured/bleeding
+  ongoing_now: 12,      // incident is happening now / suspect still on scene
   multiple_victims: 8,  // more than one person affected/targeted
   property_loss: 5,     // valuables stolen or property damaged/lost
-  resolved_past: -12,   // event is over; suspect gone; no current danger
+  resolved_past: -5,    // event is over; suspect gone; no current danger
 };
 
 const SIGNAL_KEYS = Object.keys(SIGNAL_DELTA);
@@ -127,6 +138,22 @@ function computeSeverity(category, signals = {}) {
     if (signals[key]) score += SIGNAL_DELTA[key];
   }
   return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+// Safety escalation guard. The single most common misclassification is a
+// weapon/force robbery landing in "Theft", which also silently drops the
+// severity ~30 points (Theft base 56 vs Armed Robbery base 82). If the
+// extracted signals prove a weapon or force against the victim, escalate the
+// label deterministically - the category definition itself says Armed Robbery
+// applies INSTEAD of Theft whenever a weapon or force is involved.
+function escalateCategory(category, signals = {}) {
+  if (category === 'Theft' && signals.weapon_involved) {
+    return { category: 'Armed Robbery', note: 'escalated Theft -> Armed Robbery (weapon involved)' };
+  }
+  if (category === 'Theft' && signals.injury_reported && signals.property_loss) {
+    return { category: 'Armed Robbery', note: 'escalated Theft -> Armed Robbery (force used against victim to take property)' };
+  }
+  return { category, note: null };
 }
 
 // Few-shot examples - Nigerian campus phrasing. ~2 per category. Each example
@@ -180,6 +207,8 @@ Signals to extract (each true/false, based ONLY on what the text says; if unclea
 
 Rules:
 - Choose the single best-fitting category using the definitions. In particular: Armed Robbery (not Theft) when a weapon is involved; Suspicious Activity only when no crime has clearly occurred yet.
+- If a weapon was used, brandished, or threatened - OR physical force was used against the victim to take property (pushed, dragged, knocked down, beaten, struggled with) - classify as Armed Robbery, NOT Theft. A quick snatch-and-run that only grabbed the item is Theft.
+- When a report plausibly fits two categories, choose the MORE serious one. This is a safety triage system: under-classifying an incident is worse than over-classifying it.
 - Extract signals strictly from the text. Do not infer beyond what is written.
 - Set is_suspicious true if the report describes something ambiguous, possibly criminal, or warranting a patrol check.
 - confidence reflects how clearly the text maps to the chosen category (high / medium / low).
@@ -256,9 +285,18 @@ async function classifyIncident(description) {
 
     const parsed = parseJsonLoose(response.text);
     const signals = (parsed && parsed.signals) || {};
-    const category = normalizeCategory(parsed && parsed.category);
-    const severity = computeSeverity(category, signals);
+    let category = normalizeCategory(parsed && parsed.category);
     const confidence = (parsed && parsed.confidence) || 'medium';
+
+    // Deterministic safety escalation (e.g. weapon robberies misread as Theft).
+    const { category: escalated, note } = escalateCategory(category, signals);
+    if (note) {
+      category = escalated;
+      logger.info(`Classification escalation: ${note}`);
+    }
+
+    const severity = computeSeverity(category, signals);
+    const reasoning = (parsed && parsed.reasoning) || '';
     const isSuspicious =
       !!parsed?.is_suspicious ||
       category === 'Suspicious Activity' ||
@@ -270,7 +308,7 @@ async function classifyIncident(description) {
       ai_is_suspicious: isSuspicious,
       ai_confidence: confidence,
       ai_signals: signals,
-      ai_reasoning: (parsed && parsed.reasoning) || '',
+      ai_reasoning: note ? `${reasoning} [${note}]` : reasoning,
     };
   } catch (error) {
     logger.warn('Gemini classification failed, using keyword + rubric fallback:', error.message);
@@ -283,16 +321,21 @@ async function classifyIncident(description) {
 // GEMINI_API_KEY is unset or the Gemini call throws.
 function classifyByKeywords(description) {
   const d = (description || '').toLowerCase();
-  const has = (...words) => words.some(w => d.includes(w));
+  // Word-boundary match (prefix): \bcult matches "cultist"/"cultists" but NOT
+  // "faculty"; \bwound matches "wounded" but NOT "around". Plain substring
+  // matching caused systematic false positives (faculty -> Cultism,
+  // around -> injury, begun -> gun, dangerous -> gang).
+  const has = (...words) =>
+    words.some(w => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(d));
 
   const signals = {
-    weapon_involved: has('gun', 'knife', 'machete', 'cutlass', 'acid', 'pistol', 'weapon', 'armed'),
+    weapon_involved: has('gun', 'knife', 'machete', 'cutlass', 'acid', 'pistol', 'weapon', 'armed', 'gunmen', 'robbers', 'wielding', 'broken bottle', 'axe', 'sword', 'dagger', 'gunshot'),
     life_threatening: has('unconscious', 'not breathing', 'severe bleeding', 'dying', 'collapsed', 'spreading fire', 'trapped'),
-    injury_reported: has('hurt', 'injur', 'bleed', 'wound', 'faint', 'collapsed', 'beat up', 'attacked'),
-    ongoing_now: has('just now', 'right now', 'ongoing', 'at the moment', 'still here', 'is happening', "he's here", 'right there'),
-    multiple_victims: has('students', 'group', 'crowd', 'people', 'they ', 'them', 'several'),
+    injury_reported: has('hurt', 'injur', 'bleed', 'wound', 'faint', 'collapsed', 'beat up', 'attacked', 'beaten', 'stabbed', 'strangled'),
+    ongoing_now: has('just now', 'right now', 'ongoing', 'at the moment', 'still here', 'is happening', "he's here", 'right there', 'just happened', 'just snatched', 'just attacked', 'currently', 'as we speak', 'still there', 'still at'),
+    multiple_victims: has('students', 'group', 'crowd', 'people', 'they', 'them', 'several'),
     property_loss: has('stolen', 'snatched', 'robbed', 'took', 'collected', 'missing', 'lost', 'broke', 'damaged', 'smashed', 'slashed'),
-    resolved_past: has('yesterday', 'earlier', 'last night', 'was stolen', 'happened', 'already', 'over now', 'fled', 'ran off', 'gone'),
+    resolved_past: has('yesterday', 'earlier', 'last night', 'was stolen', 'happened', 'already', 'over now', 'fled', 'ran off', 'ran away', 'ran towards', 'rode off', 'disappeared', 'escaped', 'gone'),
   };
 
   let category = 'Other';
@@ -304,7 +347,11 @@ function classifyByKeywords(description) {
   else if (has('medic', 'injur', 'faint', 'collapsed', 'ambulance', 'unconscious', 'sick', 'accident')) category = 'Emergency / Medical';
   else if (has('vandal', 'damage', 'smashed', 'defac', 'slashed', 'keyed')) category = 'Vandalism';
   else if (has('theft', 'stolen', 'snatched', 'robbed', 'missing', 'lost')) category = 'Theft';
-  else if (has('suspicious', 'lurking', 'following', 'tailing', 'unattended')) category = 'Suspicious Activity';
+  else if (has('suspicious', 'lurking', 'lingering', 'following', 'tailing', 'unattended', 'taking photos', 'stranger')) category = 'Suspicious Activity';
+
+  // Same deterministic escalation as the LLM path (e.g. force-theft -> Armed Robbery).
+  const { category: escalated, note } = escalateCategory(category, signals);
+  category = escalated;
 
   return {
     ai_category_suggestion: category,
@@ -312,7 +359,7 @@ function classifyByKeywords(description) {
     ai_is_suspicious: category === 'Suspicious Activity',
     ai_confidence: 'low',
     ai_signals: signals,
-    ai_reasoning: 'Keyword + rubric fallback (LLM unavailable).',
+    ai_reasoning: note ? `Keyword + rubric fallback (LLM unavailable). [${note}]` : 'Keyword + rubric fallback (LLM unavailable).',
   };
 }
 
